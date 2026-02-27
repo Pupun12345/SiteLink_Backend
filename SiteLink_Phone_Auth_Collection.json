@@ -437,7 +437,88 @@
       "description": "User login endpoints"
     },
     {
-      "name": "4. Test Scenarios",
+      "name": "4. Forgot Password",
+      "item": [
+        {
+          "name": "Request Password Reset (Forgot Password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Step 1: Request password reset for a registered phone number. Returns OTP (valid for 10 minutes). Note: Copy the OTP from response for next step."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/verify-reset-otp",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "verify-reset-otp"]
+            },
+            "description": "Step 2: Verify the OTP received from forgot-password. Returns a resetPasswordToken (valid for 15 minutes). Note: Copy the resetPasswordToken from response for final step."
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"resetPasswordToken\": \"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6\",\n  \"newPassword\": \"newSecurePass123\",\n  \"confirmPassword\": \"newSecurePass123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Step 3: Reset password using the resetPasswordToken from previous step. Password must be minimum 8 characters. After successful reset, user can login with new password."
+          },
+          "response": []
+        }
+      ],
+      "description": "Forgot password flow with OTP verification"
+    },
+    {
+      "name": "5. Test Scenarios",
       "item": [
         {
           "name": "Invalid Phone Format",

@@ -146,6 +146,37 @@ const resendOtpValidation = [
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Please provide a valid 10-digit phone number'),
 ];
+const forgotPasswordValidation = [
+  body('phone')
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Please provide a valid 10-digit phone number'),
+];
+
+const verifyResetOtpValidation = [
+  body('phone')
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Please provide a valid 10-digit phone number'),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('OTP must be 6 digits')
+    .isNumeric()
+    .withMessage('OTP must contain only numbers'),
+];
+
+const resetPasswordValidation = [
+  body('phone')
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Please provide a valid 10-digit phone number'),
+  body('resetPasswordToken')
+    .notEmpty()
+    .withMessage('Reset password token is required'),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters'),
+  body('confirmPassword')
+    .notEmpty()
+    .withMessage('Please confirm your password'),
+];
 
 // Public routes
 router.post('/register', 
@@ -162,5 +193,7 @@ router.post('/register',
 router.post('/verify-otp', verifyOtpValidation, verifyOtp);
 router.post('/resend-otp', resendOtpValidation, resendOtp);
 router.post('/login', loginValidation, login);
-
+router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
+router.post('/verify-reset-otp', verifyResetOtpValidation, verifyResetOtp);
+router.post('/reset-password', resetPasswordValidation, resetPassword);
 module.exports = router;
