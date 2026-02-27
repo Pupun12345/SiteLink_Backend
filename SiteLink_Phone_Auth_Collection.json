@@ -1,0 +1,626 @@
+{
+  "info": {
+    "name": "SiteLink Phone Auth API",
+    "description": "Complete SiteLink Backend API with Phone Authentication, OTP Verification, and Image Upload",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "sitelink-phone-auth-2026",
+    "version": "2.0.0"
+  },
+  "item": [
+    {
+      "name": "1. Registration Flow",
+      "item": [
+        {
+          "name": "Register Customer (with Image)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Rajesh Kumar",
+                  "type": "text",
+                  "description": "User's full name (required)"
+                },
+                {
+                  "key": "phone",
+                  "value": "9876543210",
+                  "type": "text",
+                  "description": "10-digit phone number starting with 6-9 (required)"
+                },
+                {
+                  "key": "password",
+                  "value": "securePass123",
+                  "type": "text",
+                  "description": "Minimum 8 characters (required)"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "securePass123",
+                  "type": "text",
+                  "description": "Must match password (required)"
+                },
+                {
+                  "key": "userType",
+                  "value": "customer",
+                  "type": "text",
+                  "description": "customer/vendor/worker (optional, default: customer)"
+                },
+                {
+                  "key": "email",
+                  "value": "rajesh.kumar@example.com",
+                  "type": "text",
+                  "description": "Email address (optional)"
+                },
+                {
+                  "key": "profileImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file: jpg/png/gif/webp, max 5MB (optional)"
+                },
+                {
+                  "key": "aadhaarFrontImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Aadhaar front side image (optional)"
+                },
+                {
+                  "key": "aadhaarBackImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Aadhaar back side image (optional)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register new customer with optional profile image. Returns OTP for verification. Note: Copy the OTP from response."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Vendor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Vendor Services Pvt Ltd",
+                  "type": "text",
+                  "description": "Display name (can be company name)"
+                },
+                {
+                  "key": "phone",
+                  "value": "9123456789",
+                  "type": "text",
+                  "description": "10-digit phone number (required)"
+                },
+                {
+                  "key": "password",
+                  "value": "vendorPass123",
+                  "type": "text",
+                  "description": "Password min 8 chars (required)"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "vendorPass123",
+                  "type": "text",
+                  "description": "Must match password (required)"
+                },
+                {
+                  "key": "userType",
+                  "value": "vendor",
+                  "type": "text",
+                  "description": "Set to vendor (required)"
+                },
+                {
+                  "key": "email",
+                  "value": "company@email.com",
+                  "type": "text",
+                  "description": "Company email address (optional)"
+                },
+                {
+                  "key": "ownerName",
+                  "value": "Suresh Sharma",
+                  "type": "text",
+                  "description": "Owner/Contact person name (optional)"
+                },
+                {
+                  "key": "companyName",
+                  "value": "Sharma Construction Pvt. Ltd.",
+                  "type": "text",
+                  "description": "Registered company name (optional)"
+                },
+                {
+                  "key": "gstNumber",
+                  "value": "27AAAAA0000A1Z5",
+                  "type": "text",
+                  "description": "15-digit GST number (optional)"
+                },
+                {
+                  "key": "licenseNumber",
+                  "value": "CON-2024-12345",
+                  "type": "text",
+                  "description": "Contractor license number (optional)"
+                },
+                {
+                  "key": "city",
+                  "value": "Mumbai, Maharashtra",
+                  "type": "text",
+                  "description": "City/Location (optional)"
+                },
+                {
+                  "key": "projectTypes",
+                  "value": "Residential Building,Commercial Building",
+                  "type": "text",
+                  "description": "Comma-separated project types (optional)"
+                },
+                {
+                  "key": "companyLogo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Company logo image (optional)"
+                },
+                {
+                  "key" : "panNumber",
+                  "value": "ABCD1234F",
+                  "type": "text",
+                  "description": "10-character PAN number (optional)"
+                },
+                {
+                  "key": "panCardImage",
+                  "type":"file",
+                  "src": " ",
+                  "description": "Pan Card image"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register vendor account"
+          },
+          "response": []
+        },
+        {
+          "name": "Register Worker",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Amit Sharma",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "8765432109",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "workerPass123",
+                  "type": "text"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "workerPass123",
+                  "type": "text"
+                },
+                {
+                  "key": "userType",
+                  "value": "worker",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "amit.sharma@example.com",
+                  "type": "text",
+                  "description": "Email address (optional)"
+                },
+                {
+                  "key": "city",
+                  "value": "Mumbai, Maharashtra",
+                  "type": "text",
+                  "description": "City/Location (optional)"
+                },
+                {
+                  "key": "dailyRate",
+                  "value": "800",
+                  "type": "text",
+                  "description": "Daily rate in rupees (optional)"
+                },
+                {
+                  "key": "aadhaarNumber",
+                  "value": "123456789012",
+                  "type": "text",
+                  "description": "12-digit Aadhaar number (optional)"
+                },
+                {
+                  "key": "experience",
+                  "value": "1-3 Years",
+                  "type": "text",
+                  "description": "Experience level: 0-1 Year, 1-3 Years, 3-5 Years, 5+ Years (optional)"
+                },
+                {
+                  "key": "skills",
+                  "value": "1,2,3",
+                  "type": "text",
+                  "description": "Comma-separated skills: Mason, Carpenter, Plumber, Electrician, Painter, Welder, Tile Work, Rod Binding (optional)"
+                },
+                {
+                  "key": "profileImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Profile image (optional)"
+                },
+                {
+                  "key": "aadhaarFrontImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Aadhaar front side image (optional)"
+                },
+                {
+                  "key": "aadhaarBackImage",
+                  "type": "file",
+                  "src": "",
+                  "description": "Aadhaar back side image (optional)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register worker account"
+          },
+          "response": []
+        }
+      ],
+      "description": "Register new users with phone number authentication"
+    },
+    {
+      "name": "2. OTP Verification",
+      "item": [
+        {
+          "name": "Verify OTP (Success)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"otp\": \"437208\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/verify-otp",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "verify-otp"]
+            },
+            "description": "Verify OTP received during registration. Use the OTP from registration response. Returns JWT token on success."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP (Wrong - Test Attempts)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"otp\": \"000000\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/verify-otp",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "verify-otp"]
+            },
+            "description": "Test OTP attempt tracking. Try 3 times to see: 'Invalid OTP. 2 attempts remaining', then 'Maximum OTP attempts reached'"
+          },
+          "response": []
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/resend-otp",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "resend-otp"]
+            },
+            "description": "Resend OTP to phone number. Resets attempt counter and generates new OTP with fresh 10-minute expiration."
+          },
+          "response": []
+        }
+      ],
+      "description": "OTP verification and resend functionality"
+    },
+    {
+      "name": "3. Login",
+      "item": [
+        {
+          "name": "Login (Verified Account)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"password\": \"securePass123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with verified phone number and password. Returns JWT token."
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Unverified Account - Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"8765432109\",\n  \"password\": \"workerPass123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Test login with unverified account. Should return 403 error: 'Please verify your account with OTP before logging in'"
+          },
+          "response": []
+        }
+      ],
+      "description": "User login endpoints"
+    },
+    {
+      "name": "4. Test Scenarios",
+      "item": [
+        {
+          "name": "Invalid Phone Format",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Test User",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "12345",
+                  "type": "text",
+                  "description": "Invalid phone number (too short)"
+                },
+                {
+                  "key": "password",
+                  "value": "testPass123",
+                  "type": "text"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "testPass123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Test invalid phone format validation. Should return 400 error."
+          },
+          "response": []
+        },
+        {
+          "name": "Password Mismatch",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Test User",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "9988776655",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "differentPass",
+                  "type": "text",
+                  "description": "Different from password"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Test password confirmation validation. Should return 400: 'Passwords do not match'"
+          },
+          "response": []
+        },
+        {
+          "name": "Duplicate Phone Number",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Another User",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "9876543210",
+                  "type": "text",
+                  "description": "Already registered phone"
+                },
+                {
+                  "key": "password",
+                  "value": "newPass123",
+                  "type": "text"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "newPass123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Test duplicate phone registration. Should return 400: 'User already exists with this phone number'"
+          },
+          "response": []
+        },
+        {
+          "name": "Password Too Short",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Test User",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "9988776655",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "pass",
+                  "type": "text",
+                  "description": "Only 4 characters (min 8 required)"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "pass",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/auth/register",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Test password length validation. Should return 400: 'Password must be at least 8 characters'"
+          },
+          "response": []
+        }
+      ],
+      "description": "Error handling and validation test cases"
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api/auth",
+      "type": "string"
+    }
+  ]
+}
