@@ -1,0 +1,270 @@
+const User = require('../models/User');
+const fs = require('fs');
+
+// Create Profile - Customer
+exports.createCustomerProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'customer') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city } = req.body;
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (city) user.city = city;
+
+    if (req.files?.profileImage) user.profileImage = req.files.profileImage[0].path;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Customer profile created successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create Profile - Worker
+exports.createWorkerProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'worker') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city, dailyRate, aadhaarNumber, experience, skills } = req.body;
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (city) user.city = city;
+    if (dailyRate) user.dailyRate = dailyRate;
+    if (aadhaarNumber) user.aadhaarNumber = aadhaarNumber;
+    if (experience) user.experience = experience;
+    if (skills) user.skills = typeof skills === 'string' ? JSON.parse(skills) : skills;
+
+    if (req.files) {
+      if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
+      if (req.files.aadhaarFrontImage) user.aadhaarFrontImage = req.files.aadhaarFrontImage[0].path;
+      if (req.files.aadhaarBackImage) user.aadhaarBackImage = req.files.aadhaarBackImage[0].path;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Worker profile created successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, dailyRate: user.dailyRate, aadhaarNumber: user.aadhaarNumber, experience: user.experience, skills: user.skills }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create Profile - Vendor
+exports.createVendorProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'vendor') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city, ownerName, companyName, panNumber, gstNumber, licenseNumber, projectTypes } = req.body;
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (city) user.city = city;
+    if (ownerName) user.ownerName = ownerName;
+    if (companyName) user.companyName = companyName;
+    if (panNumber) user.panNumber = panNumber;
+    if (gstNumber) user.gstNumber = gstNumber;
+    if (licenseNumber) user.licenseNumber = licenseNumber;
+    if (projectTypes) user.projectTypes = typeof projectTypes === 'string' ? JSON.parse(projectTypes) : projectTypes;
+
+    if (req.files) {
+      if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
+      if (req.files.companyLogo) user.companyLogo = req.files.companyLogo[0].path;
+      if (req.files.panCardImage) user.panCardImage = req.files.panCardImage[0].path;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Vendor profile created successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, ownerName: user.ownerName, companyName: user.companyName, panNumber: user.panNumber, gstNumber: user.gstNumber, licenseNumber: user.licenseNumber, projectTypes: user.projectTypes, companyLogo: user.companyLogo }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Edit Profile - Customer
+exports.editCustomerProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'customer') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (city) updateData.city = city;
+
+    if (req.files?.profileImage) {
+      if (user.profileImage) fs.unlink(user.profileImage, () => {});
+      updateData.profileImage = req.files.profileImage[0].path;
+    }
+
+    Object.assign(user, updateData);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Customer profile updated successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Edit Profile - Worker
+exports.editWorkerProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'worker') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city, dailyRate, aadhaarNumber, experience, skills } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (city) updateData.city = city;
+    if (dailyRate) updateData.dailyRate = dailyRate;
+    if (aadhaarNumber) updateData.aadhaarNumber = aadhaarNumber;
+    if (experience) updateData.experience = experience;
+    if (skills) updateData.skills = typeof skills === 'string' ? JSON.parse(skills) : skills;
+
+    if (req.files) {
+      if (req.files.profileImage) {
+        if (user.profileImage) fs.unlink(user.profileImage, () => {});
+        updateData.profileImage = req.files.profileImage[0].path;
+      }
+      if (req.files.aadhaarFrontImage) {
+        if (user.aadhaarFrontImage) fs.unlink(user.aadhaarFrontImage, () => {});
+        updateData.aadhaarFrontImage = req.files.aadhaarFrontImage[0].path;
+      }
+      if (req.files.aadhaarBackImage) {
+        if (user.aadhaarBackImage) fs.unlink(user.aadhaarBackImage, () => {});
+        updateData.aadhaarBackImage = req.files.aadhaarBackImage[0].path;
+      }
+    }
+
+    Object.assign(user, updateData);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Worker profile updated successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, dailyRate: user.dailyRate, aadhaarNumber: user.aadhaarNumber, experience: user.experience, skills: user.skills }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Edit Profile - Vendor
+exports.editVendorProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'vendor') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, city, ownerName, companyName, panNumber, gstNumber, licenseNumber, projectTypes } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (city) updateData.city = city;
+    if (ownerName) updateData.ownerName = ownerName;
+    if (companyName) updateData.companyName = companyName;
+    if (panNumber) updateData.panNumber = panNumber;
+    if (gstNumber) updateData.gstNumber = gstNumber;
+    if (licenseNumber) updateData.licenseNumber = licenseNumber;
+    if (projectTypes) updateData.projectTypes = typeof projectTypes === 'string' ? JSON.parse(projectTypes) : projectTypes;
+
+    if (req.files) {
+      if (req.files.profileImage) {
+        if (user.profileImage) fs.unlink(user.profileImage, () => {});
+        updateData.profileImage = req.files.profileImage[0].path;
+      }
+      if (req.files.companyLogo) {
+        if (user.companyLogo) fs.unlink(user.companyLogo, () => {});
+        updateData.companyLogo = req.files.companyLogo[0].path;
+      }
+      if (req.files.panCardImage) {
+        if (user.panCardImage) fs.unlink(user.panCardImage, () => {});
+        updateData.panCardImage = req.files.panCardImage[0].path;
+      }
+    }
+
+    Object.assign(user, updateData);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Vendor profile updated successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, ownerName: user.ownerName, companyName: user.companyName, panNumber: user.panNumber, gstNumber: user.gstNumber, licenseNumber: user.licenseNumber, projectTypes: user.projectTypes, companyLogo: user.companyLogo }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get Profile
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        userType: user.userType,
+        role: user.role,
+        profileImage: user.profileImage,
+        aadhaarFrontImage: user.aadhaarFrontImage,
+        aadhaarBackImage: user.aadhaarBackImage,
+        panCardImage: user.panCardImage,
+        city: user.city,
+        dailyRate: user.dailyRate,
+        aadhaarNumber: user.aadhaarNumber,
+        experience: user.experience,
+        skills: user.skills,
+        companyLogo: user.companyLogo,
+        ownerName: user.ownerName,
+        companyName: user.companyName,
+        panNumber: user.panNumber,
+        gstNumber: user.gstNumber,
+        licenseNumber: user.licenseNumber,
+        projectTypes: user.projectTypes,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

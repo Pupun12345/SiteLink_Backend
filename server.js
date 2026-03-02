@@ -5,6 +5,7 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const skillsRoutes = require('./routes/skillsRoutes');
 
+
 // Load env variables
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/uploads', express.static('uploads'));
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/skills',skillsRoutes);
+app.use('/api/profile', require('./routes/profileRoutes'));
 
 // Root route
 app.get('/', (req, res) => {
