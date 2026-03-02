@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const BlacklistedToken = require('../models/BlacklistedToken');
 
-// Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
   let token;
 
@@ -20,10 +20,20 @@ exports.protect = async (req, res, next) => {
   }
 
   try {
+    // CHECK IF TOKEN IS BLACKLISTED
+    const blacklisted = await BlacklistedToken.findOne({ token });
+
+    if (blacklisted) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has been logged out',
+      });
+    }
+
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from token
+    // Get user
     req.user = await User.findById(decoded.id);
 
     if (!req.user) {
@@ -37,20 +47,7 @@ exports.protect = async (req, res, next) => {
   } catch (error) {
     return res.status(401).json({
       success: false,
-      message: 'Not authorized to access this route',
+      message: 'Invalid or expired token',
     });
   }
-};
-
-// Grant access to specific roles
-exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `User role ${req.user.role} is not authorized to access this route`,
-      });
-    }
-    next();
-  };
 };

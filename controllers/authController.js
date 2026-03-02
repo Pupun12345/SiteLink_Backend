@@ -3,6 +3,7 @@ const { sendTokenResponse } = require('../utils/tokenUtils');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const skillsReference = require('../models/SkillReference');
+const BlacklistedToken = require('../models/BlacklistedToken');
 const crypto = require('crypto');
 
 // @desc    Register user
@@ -176,7 +177,7 @@ exports.register = async (req, res) => {
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     // Validate request
     const errors = validationResult(req);
@@ -236,7 +237,7 @@ exports.login = async (req, res) => {
 // @desc    Get current logged in user
 // @route   GET /api/auth/me
 // @access  Private
-exports.getMe = async (req, res) => {
+exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
 
@@ -252,7 +253,7 @@ exports.getMe = async (req, res) => {
 // @desc    Verify OTP
 // @route   POST /api/auth/verify-otp
 // @access  Public
-exports.verifyOtp = async (req, res) => {
+exports.verifyOtp = async (req, res, next) => {
   try {
     const { phone, otp } = req.body;
 
@@ -333,7 +334,7 @@ exports.verifyOtp = async (req, res) => {
 // @desc    Resend OTP
 // @route   POST /api/auth/resend-otp
 // @access  Public
-exports.resendOtp = async (req, res) => {
+exports.resendOtp = async (req, res, next) => {
   try {
     const { phone } = req.body;
 
@@ -394,11 +395,31 @@ exports.resendOtp = async (req, res) => {
 // @desc    Logout user
 // @route   POST /api/auth/logout
 // @access  Private
+
 exports.logout = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'User logged out successfully',
-  });
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "No token provided",
+      });
+    }
+
+    // Save token to blacklist
+    await BlacklistedToken.create({ token });
+
+    res.status(200).json({
+      success: true,
+      message: "User logged out successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
 };
 
 // @desc Forgot password - Send OTP

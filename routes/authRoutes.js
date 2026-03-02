@@ -9,8 +9,10 @@ const {
   resendOtp,
   forgotPassword,      
   verifyResetOtp,      
-  resetPassword,  
+  resetPassword,
+  logout,
 } = require('../controllers/authController');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -196,4 +198,6 @@ router.post('/login', loginValidation, login);
 router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
 router.post('/verify-reset-otp', verifyResetOtpValidation, verifyResetOtp);
 router.post('/reset-password', resetPasswordValidation, resetPassword);
+router.post('/logout', protect, logout);
+
 module.exports = router;
