@@ -160,6 +160,59 @@ The API supports three user types:
 All three types use the same registration and login endpoints but can be differentiated by the `userType` field.
   ```
 
+## Help & Support Endpoint
+
+When users or visitors need assistance, they can submit a help/support request.
+
+### 1. Submit a Request
+- **URL**: `POST /api/help-support`
+- **Content-Type**: `application/json`
+- **Body** (only **subject** and **message** are required):
+  ```json
+  {
+    "name": "Optional name",
+    "email": "optional@example.com",
+    "phone": "9876543210",
+    "subject": "Issue with login",
+    "message": "I'm unable to log in using my credentials."
+  }
+  ```
+- **Notes**:
+  - You may be authenticated; if so the system will attach your user
+    information automatically.
+  - The endpoint is public; visitors need not log in.
+- **Successful Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Your request has been submitted successfully",
+    "data": {
+      "_id": "ticket_id",
+      "name": "Optional name",
+      "email": "optional@example.com",
+      "phone": "9876543210",
+      "subject": "Issue with login",
+      "message": "I'm unable to log in using my credentials.",
+      "createdAt": "2026-03-02T12:34:56.789Z",
+      "__v": 0
+    }
+  }
+  ```
+
+### 2. Administrative Routes
+Only users with the `admin` role can view tickets.
+
+- **List all tickets**
+  - **URL**: `GET /api/help-support`
+  - **Headers**: `Authorization: Bearer <token>`
+
+- **Get single ticket by ID**
+  - **URL**: `GET /api/help-support/:id`
+  - **Headers**: `Authorization: Bearer <token>`
+
+These responses return arrays or objects containing the stored requests.
+
+
 ## Postman Testing Guide
 
 **📖 For detailed testing guide, see:** [PHONE_AUTH_API_GUIDE.md](PHONE_AUTH_API_GUIDE.md)

@@ -22,6 +22,7 @@ Authorization: Bearer <your_jwt_token>
 - **Authentication**: Required (userType must be `customer`)
 - **Form Data Fields**:
   ```
+  role: customer (required - must match userType)
   name: Rajesh Kumar (optional)
   email: rajesh@example.com (optional)
   city: Mumbai (optional)
@@ -38,6 +39,7 @@ Authorization: Bearer <your_jwt_token>
       "phone": "9876543210",
       "email": "rajesh@example.com",
       "userType": "customer",
+      "role": "customer",
       "profileImage": "uploads/profiles/profile-1234567890.jpg",
       "city": "Mumbai"
     }
@@ -81,6 +83,7 @@ Authorization: Bearer <your_jwt_token>
 - **Authentication**: Required (userType must be `worker`)
 - **Form Data Fields**:
   ```
+  role: worker (required - must match userType)
   name: Suresh Yadav (optional)
   email: suresh@example.com (optional)
   city: Delhi (required)
@@ -103,6 +106,7 @@ Authorization: Bearer <your_jwt_token>
       "phone": "9876543210",
       "email": "suresh@example.com",
       "userType": "worker",
+      "role": "plumber",
       "profileImage": "uploads/profiles/profile-1234567890.jpg",
       "city": "Delhi",
       "dailyRate": 1500,
@@ -156,6 +160,7 @@ Authorization: Bearer <your_jwt_token>
 - **Authentication**: Required (userType must be `vendor`)
 - **Form Data Fields**:
   ```
+  role: vendor (required - must match userType)
   name: Amit Sharma (optional)
   email: amit@example.com (optional)
   city: Bangalore (optional)
@@ -180,6 +185,7 @@ Authorization: Bearer <your_jwt_token>
       "phone": "9876543210",
       "email": "amit@example.com",
       "userType": "vendor",
+      "role": "construction",
       "profileImage": "uploads/profiles/profile-1234567890.jpg",
       "city": "Bangalore",
       "ownerName": "Amit Sharma",
@@ -311,7 +317,7 @@ Authorization: Bearer <your_jwt_token>
 ### Customer Profile Test
 - **Create**: POST `http://localhost:5000/api/profile/customer/create`
   - Body Type: form-data
-  - Fields: name, email, city, profileImage
+  - Fields: role, name, email, city, profileImage
 - **Edit**: PUT `http://localhost:5000/api/profile/customer/edit`
   - Body Type: form-data
   - Fields: (only fields to update)
@@ -320,7 +326,7 @@ Authorization: Bearer <your_jwt_token>
 ### Worker Profile Test
 - **Create**: POST `http://localhost:5000/api/profile/worker/create`
   - Body Type: form-data
-  - Fields: name, email, city, dailyRate, aadhaarNumber, experience, skills, profileImage, aadhaarFrontImage, aadhaarBackImage
+  - Fields: role, name, email, city, dailyRate, aadhaarNumber, experience, skills, profileImage, aadhaarFrontImage, aadhaarBackImage
 - **Edit**: PUT `http://localhost:5000/api/profile/worker/edit`
   - Body Type: form-data
   - Fields: (only fields to update)

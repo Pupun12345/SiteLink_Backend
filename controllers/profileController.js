@@ -9,10 +9,14 @@ exports.createCustomerProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { name, email, city } = req.body;
+    const { name, email, city, role } = req.body;
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
     if (name) user.name = name;
     if (email) user.email = email;
     if (city) user.city = city;
+    user.role = role;
 
     if (req.files?.profileImage) user.profileImage = req.files.profileImage[0].path;
 
@@ -21,7 +25,7 @@ exports.createCustomerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Customer profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city }
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, city: user.city }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -36,7 +40,10 @@ exports.createWorkerProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { name, email, city, dailyRate, aadhaarNumber, experience, skills } = req.body;
+    const { name, email, city, dailyRate, aadhaarNumber, experience, skills, role } = req.body;
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
     if (name) user.name = name;
     if (email) user.email = email;
     if (city) user.city = city;
@@ -44,6 +51,7 @@ exports.createWorkerProfile = async (req, res) => {
     if (aadhaarNumber) user.aadhaarNumber = aadhaarNumber;
     if (experience) user.experience = experience;
     if (skills) user.skills = typeof skills === 'string' ? JSON.parse(skills) : skills;
+    user.role = role;
 
     if (req.files) {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
@@ -56,7 +64,7 @@ exports.createWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, dailyRate: user.dailyRate, aadhaarNumber: user.aadhaarNumber, experience: user.experience, skills: user.skills }
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, city: user.city, dailyRate: user.dailyRate, aadhaarNumber: user.aadhaarNumber, experience: user.experience, skills: user.skills }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -71,7 +79,10 @@ exports.createVendorProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { name, email, city, ownerName, companyName, panNumber, gstNumber, licenseNumber, projectTypes } = req.body;
+    const { name, email, city, ownerName, companyName, panNumber, gstNumber, licenseNumber, projectTypes, role } = req.body;
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
     if (name) user.name = name;
     if (email) user.email = email;
     if (city) user.city = city;
@@ -81,6 +92,7 @@ exports.createVendorProfile = async (req, res) => {
     if (gstNumber) user.gstNumber = gstNumber;
     if (licenseNumber) user.licenseNumber = licenseNumber;
     if (projectTypes) user.projectTypes = typeof projectTypes === 'string' ? JSON.parse(projectTypes) : projectTypes;
+    user.role = role;
 
     if (req.files) {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
@@ -93,7 +105,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, profileImage: user.profileImage, city: user.city, ownerName: user.ownerName, companyName: user.companyName, panNumber: user.panNumber, gstNumber: user.gstNumber, licenseNumber: user.licenseNumber, projectTypes: user.projectTypes, companyLogo: user.companyLogo }
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, city: user.city, ownerName: user.ownerName, companyName: user.companyName, panNumber: user.panNumber, gstNumber: user.gstNumber, licenseNumber: user.licenseNumber, projectTypes: user.projectTypes, companyLogo: user.companyLogo }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -263,6 +275,67 @@ exports.getProfile = async (req, res) => {
         isVerified: user.isVerified,
         createdAt: user.createdAt
       }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create Profile - Admin
+exports.createAdminProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email, role } = req.body;
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
+    if (name) user.name = name;
+    if (email) user.email = email;
+    user.role = role;
+
+    if (req.files?.profileImage) user.profileImage = req.files.profileImage[0].path;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Admin profile created successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Edit Profile - Admin
+exports.editAdminProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { name, email } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+
+    if (req.files?.profileImage) {
+      if (user.profileImage) fs.unlink(user.profileImage, () => {});
+      updateData.profileImage = req.files.profileImage[0].path;
+    }
+
+    Object.assign(user, updateData);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Admin profile updated successfully',
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
