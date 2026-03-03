@@ -690,6 +690,229 @@
         }
       ],
       "description": "Error handling and validation test cases"
+    },
+    {
+      "name": "6. Legal Documents",
+      "item": [
+        {
+          "name": "Get Privacy Policy (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/legal/privacy-policy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", "privacy-policy"]
+            },
+            "description": "Get the current Privacy Policy. No authentication required. Anyone can view this document."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Terms and Conditions (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/legal/terms-conditions",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", "terms-conditions"]
+            },
+            "description": "Get the current Terms and Conditions. No authentication required. Anyone can view this document."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Legal Documents (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token from login"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/legal/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", ""]
+            },
+            "description": "Get all legal documents with full details. Admin only. Returns privacy policy and terms & conditions with version history."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Update Privacy Policy (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "privacy-policy",
+                  "type": "text",
+                  "description": "Document type: privacy-policy or terms-conditions (required)"
+                },
+                {
+                  "key": "title",
+                  "value": "Privacy Policy",
+                  "type": "text",
+                  "description": "Document title (required)"
+                },
+                {
+                  "key": "content",
+                  "value": "<h1>Privacy Policy</h1><p>We respect your privacy and are committed to protecting your personal information...</p><h2>Information We Collect</h2><p>- Personal identification information (Name, email, phone number, etc.)</p><p>- Usage data and analytics</p><h2>How We Use Your Information</h2><p>- To provide and maintain our service</p><p>- To notify you about changes to our service</p><p>- To provide customer support</p>",
+                  "type": "text",
+                  "description": "Full document content (can include HTML for formatting) (required)"
+                },
+                {
+                  "key": "version",
+                  "value": "1.0",
+                  "type": "text",
+                  "description": "Version number (optional, default: 1.0)"
+                },
+                {
+                  "key": "effectiveDate",
+                  "value": "2024-03-01T00:00:00.000Z",
+                  "type": "text",
+                  "description": "Effective date in ISO format (optional, default: current date)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/legal/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", ""]
+            },
+            "description": "Create or update Privacy Policy. Admin only. Content can include HTML for formatting. If document exists, it will be updated; otherwise, a new one is created."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Update Terms and Conditions (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "terms-conditions",
+                  "type": "text",
+                  "description": "Document type: privacy-policy or terms-conditions (required)"
+                },
+                {
+                  "key": "title",
+                  "value": "Terms and Conditions",
+                  "type": "text",
+                  "description": "Document title (required)"
+                },
+                {
+                  "key": "content",
+                  "value": "<h1>Terms and Conditions</h1><p>Welcome to SiteLink. By using our service, you agree to these terms...</p><h2>Acceptance of Terms</h2><p>By accessing and using this service, you accept and agree to be bound by the terms and conditions.</p><h2>User Responsibilities</h2><p>- You must provide accurate information during registration</p><p>- You are responsible for maintaining the confidentiality of your account</p><p>- You must not misuse our services</p><h2>Service Availability</h2><p>We strive to provide uninterrupted service but do not guarantee 100% uptime.</p>",
+                  "type": "text",
+                  "description": "Full document content (can include HTML for formatting) (required)"
+                },
+                {
+                  "key": "version",
+                  "value": "1.0",
+                  "type": "text",
+                  "description": "Version number (optional, default: 1.0)"
+                },
+                {
+                  "key": "effectiveDate",
+                  "value": "2024-03-01T00:00:00.000Z",
+                  "type": "text",
+                  "description": "Effective date in ISO format (optional, default: current date)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/legal/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", ""]
+            },
+            "description": "Create or update Terms and Conditions. Admin only. Content can include HTML for formatting. If document exists, it will be updated; otherwise, a new one is created."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Privacy Policy (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/legal/privacy-policy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", "privacy-policy"]
+            },
+            "description": "Delete Privacy Policy document. Admin only. Use with caution as this permanently removes the document."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Terms and Conditions (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/legal/terms-conditions",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "legal", "terms-conditions"]
+            },
+            "description": "Delete Terms and Conditions document. Admin only. Use with caution as this permanently removes the document."
+          },
+          "response": []
+        }
+      ],
+      "description": "Privacy Policy and Terms & Conditions API - Public access for viewing, Admin only for management"
     }
   ],
   "variable": [
@@ -702,6 +925,12 @@
       "key": "apiPrefix",
       "value": "/api/auth",
       "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string",
+      "description": "Store admin JWT token here after admin login"
     }
   ]
 }

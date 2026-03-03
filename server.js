@@ -30,6 +30,7 @@ app.use('/api/skills',skillsRoutes);
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/help-support', require('./routes/helpSupportRoutes'));
 app.use('/api/jobs', jobRoutes);
+app.use('/api/legal', require('./routes/legalRoutes'));
 
 // Root route
 app.get('/', (req, res) => {
