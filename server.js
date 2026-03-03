@@ -4,6 +4,8 @@ const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const skillsRoutes = require('./routes/skillsRoutes');
+const jobRoutes = require("./routes/jobRoutes")
+
 
 
 // Load env variables
@@ -27,6 +29,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/skills',skillsRoutes);
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/help-support', require('./routes/helpSupportRoutes'));
+app.use('/api/jobs', jobRoutes);
 app.use('/api/legal', require('./routes/legalRoutes'));
 
 // Root route
