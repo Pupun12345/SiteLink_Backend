@@ -1,10 +1,10 @@
 {
   "info": {
-    "name": "SiteLink Phone Auth API",
-    "description": "Complete SiteLink Backend API with Phone Authentication, OTP Verification, and Image Upload",
+    "name": "SiteLink Complete API",
+    "description": "Complete SiteLink Backend API with Phone Authentication, OTP Verification, Image Upload, Search & Filter functionality",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "sitelink-phone-auth-2026",
-    "version": "2.0.0"
+    "version": "3.0.0"
   },
   "item": [
     {
@@ -913,6 +913,351 @@
         }
       ],
       "description": "Privacy Policy and Terms & Conditions API - Public access for viewing, Admin only for management"
+    },
+    {
+      "name": "7. Search & Filter APIs",
+      "item": [
+        {
+          "name": "Search Workers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/workers?city=Delhi&skills=Electrical&minRate=1000&maxRate=2000&experience=3-5 Years&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "workers"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Delhi",
+                  "description": "Filter by city (optional)"
+                },
+                {
+                  "key": "skills",
+                  "value": "Electrical",
+                  "description": "Comma-separated skills (optional)"
+                },
+                {
+                  "key": "experience",
+                  "value": "3-5 Years",
+                  "description": "Experience level (optional)"
+                },
+                {
+                  "key": "minRate",
+                  "value": "1000",
+                  "description": "Minimum daily rate (optional)"
+                },
+                {
+                  "key": "maxRate",
+                  "value": "2000",
+                  "description": "Maximum daily rate (optional)"
+                },
+                {
+                  "key": "search",
+                  "value": null,
+                  "description": "General search across name, city, skills (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "dailyRate",
+                  "description": "Field to sort by (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "asc",
+                  "description": "Sort order: asc or desc (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Search and filter workers by city, skills, experience, and daily rate range. Returns paginated results with worker profiles."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Vendors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/vendors?city=Mumbai&projectTypes=Residential Building,Commercial Building&isVerified=true&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "vendors"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Mumbai",
+                  "description": "Filter by city (optional)"
+                },
+                {
+                  "key": "projectTypes",
+                  "value": "Residential Building,Commercial Building",
+                  "description": "Comma-separated project types (optional)"
+                },
+                {
+                  "key": "isVerified",
+                  "value": "true",
+                  "description": "Filter by verification status: true or false (optional)"
+                },
+                {
+                  "key": "search",
+                  "value": null,
+                  "description": "General search across name, company, owner (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "companyName",
+                  "description": "Field to sort by (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "asc",
+                  "description": "Sort order: asc or desc (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Search and filter vendors by city, project types, and verification status. Returns paginated results with vendor profiles."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/jobs?location=Bangalore&type=Full-time&skills=JavaScript,Node.js&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "jobs"],
+              "query": [
+                {
+                  "key": "location",
+                  "value": "Bangalore",
+                  "description": "Filter by job location (optional)"
+                },
+                {
+                  "key": "type",
+                  "value": "Full-time",
+                  "description": "Job type: Full-time or Part-time (optional)"
+                },
+                {
+                  "key": "company",
+                  "value": null,
+                  "description": "Filter by company name (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "skills",
+                  "value": "JavaScript,Node.js",
+                  "description": "Comma-separated skills required (optional)"
+                },
+                {
+                  "key": "search",
+                  "value": null,
+                  "description": "General search across title, company, description (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Field to sort by (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "Sort order: asc or desc (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Search and filter jobs by location, type, company, and required skills. Returns paginated job listings with poster details."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Support Tickets (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/search/support?search=payment issue&page=1&limit=25",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "support"],
+              "query": [
+                {
+                  "key": "email",
+                  "value": null,
+                  "description": "Filter by email (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "phone",
+                  "value": null,
+                  "description": "Filter by phone number (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "payment issue",
+                  "description": "General search across name, email, subject, message (optional)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Field to sort by (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "Sort order: asc or desc (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "25",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Search help and support tickets. Admin only. Search by email, phone, or general text across all fields."
+          },
+          "response": []
+        },
+        {
+          "name": "Global Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/global?query=electrician&limit=5",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "global"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "electrician",
+                  "description": "Search term (required)"
+                },
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "Results per category (default: 5)"
+                }
+              ]
+            },
+            "description": "Search across all entities (workers, vendors, jobs) simultaneously. Returns limited results from each category."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker Filter Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/workers/filters",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "workers", "filters"]
+            },
+            "description": "Get available filter options for workers including cities, skills, experience levels, and daily rate range. Use these values to populate filter dropdowns."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Vendor Filter Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/vendors/filters",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "vendors", "filters"]
+            },
+            "description": "Get available filter options for vendors including cities and project types. Use these values to populate filter dropdowns."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Filter Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/api/search/jobs/filters",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "search", "jobs", "filters"]
+            },
+            "description": "Get available filter options for jobs including locations, companies, skills, and job types. Use these values to populate filter dropdowns."
+          },
+          "response": []
+        }
+      ],
+      "description": "Search and filter APIs for workers, vendors, jobs, and support tickets with pagination and sorting"
     }
   ],
   "variable": [
