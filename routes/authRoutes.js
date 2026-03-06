@@ -5,6 +5,7 @@ const skillsReference = require('../models/SkillReference');
 const {
   register,
   login,
+  adminLogin,
   verifyOtp,
   resendOtp,
   forgotPassword,      
@@ -132,6 +133,11 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const adminLoginValidation = [
+  body('email').isEmail().withMessage('Please provide a valid email address'),
+  body('password').notEmpty().withMessage('Password is required'),
+];
+
 const verifyOtpValidation = [
   body('phone')
     .matches(/^[6-9]\d{9}$/)
@@ -195,6 +201,7 @@ router.post('/register',
 router.post('/verify-otp', verifyOtpValidation, verifyOtp);
 router.post('/resend-otp', resendOtpValidation, resendOtp);
 router.post('/login', loginValidation, login);
+router.post('/admin/login', adminLoginValidation, adminLogin);
 router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
 router.post('/verify-reset-otp', verifyResetOtpValidation, verifyResetOtp);
 router.post('/reset-password', resetPasswordValidation, resetPassword);

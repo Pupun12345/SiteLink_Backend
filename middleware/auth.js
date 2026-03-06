@@ -52,6 +52,17 @@ exports.protect = async (req, res, next) => {
   }
 };
 
+
+exports.adminOnly = (req, res, next) => {
+  if (req.user && req.user.userType === 'admin') {
+    next();
+  } else {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admins only.',
+    });
+  }
+}
 // Authorize specific roles
 exports.authorize = (...roles) => {
   return (req, res, next) => {
