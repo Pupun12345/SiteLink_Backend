@@ -150,6 +150,32 @@
   ```
   **Note**: Login is only allowed for verified accounts. Unverified users will receive an error.
 
+#### 5. Admin Login
+- **URL**: `POST /api/auth/admin/login`
+- **Content-Type**: `application/json`
+- **Body**:
+  ```json
+  {
+    "email": "admin@sitelink.in",
+    "password": "<your-admin-password>"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "redirectTo": "/admin/dashboard",
+    "user": {
+      "id": "admin_user_id",
+      "name": "Admin Name",
+      "email": "admin@sitelink.in",
+      "role": "admin"
+    }
+  }
+  ```
+  **Note**: The password must match the hashed value stored in the database.
+
 ## User Types
 
 The API supports three user types:

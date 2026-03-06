@@ -5,8 +5,12 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const skillsRoutes = require('./routes/skillsRoutes');
 const jobRoutes = require("./routes/jobRoutes")
+<<<<<<< HEAD
 
 
+=======
+const statsRoutes=require('./routes/statsRoutes')
+>>>>>>> a4f0b37 (adding admin login and stats(woker and vendor)api)
 
 // Load env variables
 dotenv.config();
@@ -31,6 +35,8 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/help-support', require('./routes/helpSupportRoutes'));
 app.use('/api/jobs', jobRoutes);
 app.use('/api/legal', require('./routes/legalRoutes'));
+app.use('/api/stats',statsRoutes );
+
 
 // Root route
 app.get('/', (req, res) => {

@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { sendTokenResponse } = require('../utils/tokenUtils');
+const { sendTokenResponse, generateToken } = require('../utils/tokenUtils');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const skillsReference = require('../models/SkillReference');
@@ -230,6 +230,71 @@ exports.login = async (req, res, next) => {
     sendTokenResponse(user, 200, res);
   } catch (error) {
     console.error('Login error:', error);
+    next(error);
+  }
+};
+
+// @desc    Admin login (email/password)
+// @route   POST /api/auth/admin/login
+// @access  Public
+exports.adminLogin = async (req, res, next) => {
+  try {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password',
+      });
+    }
+
+    // Find admin user
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (!user || user.role !== 'admin') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
+    }
+
+    // Check if password matches
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
+    }
+
+    // Send token response
+    const token = generateToken(user._id);
+
+    const userData = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    return res.status(200).json({
+      success: true,
+      token,
+      redirectTo: '/admin/dashboard',
+      user: userData,
+    });
+    
+  } catch (error) {
+    console.error('Admin login error:', error);
     next(error);
   }
 };
