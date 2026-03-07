@@ -176,6 +176,106 @@
   ```
   **Note**: The password must match the hashed value stored in the database.
 
+## Admin: Worker Verification Workflow
+
+This section describes the **Admin flow** for verifying workers' uploaded documents.
+
+### 1) List pending verifications
+- **URL**: `GET /api/admin/workers/pending`
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "count": 2,
+    "data": [
+      {
+        "_id": "worker_id_1",
+        "name": "Ravi Kumar",
+        "phone": "9876543210",
+        "role": "Electrician",
+        "experience": "1-3 Years",
+        "city": "Delhi",
+        "profileImage": "uploads/profiles/profile-...jpg",
+        "verificationStatus": "pending"
+      }
+    ]
+  }
+  ```
+
+### 2) View worker details
+- **URL**: `GET /api/admin/workers/{id}`
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+- **Response** (includes uploaded documents):
+  ```json
+  {
+    "success": true,
+    "data": {
+      "_id": "worker_id_1",
+      "name": "Ravi Kumar",
+      "age": 28,
+      "phone": "9876543210",
+      "experience": "1-3 Years",
+      "city": "Delhi",
+      "dailyRate": 800,
+      "profileImage": "uploads/profiles/profile-...jpg",
+      "aadhaarFrontImage": "uploads/documents/aadhaar-front-...jpg",
+      "aadhaarBackImage": "uploads/documents/aadhaar-back-...jpg",
+      "certificates": [
+        "uploads/documents/certificate-...jpg"
+      ],
+      "skills": [
+        {"skillId": 1, "skillName": "Electrical Wiring"},
+        {"skillId": 2, "skillName": "Panel Installation"}
+      ],
+      "verificationStatus": "pending",
+      "isVerified": false
+    }
+  }
+  ```
+
+### 3) Approve worker verification
+- **URL**: `PUT /api/admin/workers/{id}/verify`
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Worker verified successfully",
+    "data": {
+      "id": "worker_id_1",
+      "verificationStatus": "verified",
+      "isVerified": true
+    }
+  }
+  ```
+
+### 4) Reject worker verification
+- **URL**: `PUT /api/admin/workers/{id}/reject`
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+- **Body** (JSON):
+  ```json
+  {
+    "reason": "ID documents are unclear / does not match profile"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Worker verification rejected",
+    "data": {
+      "id": "worker_id_1",
+      "verificationStatus": "rejected",
+      "rejectionReason": "ID documents are unclear / does not match profile"
+    }
+  }
+  ```
+
 ## User Types
 
 The API supports three user types:

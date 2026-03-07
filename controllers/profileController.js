@@ -57,6 +57,9 @@ exports.createWorkerProfile = async (req, res) => {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
       if (req.files.aadhaarFrontImage) user.aadhaarFrontImage = req.files.aadhaarFrontImage[0].path;
       if (req.files.aadhaarBackImage) user.aadhaarBackImage = req.files.aadhaarBackImage[0].path;
+      if (req.files.certificateImages) {
+        user.certificates = req.files.certificateImages.map(file => file.path);
+      }
     }
 
     await user.save();
@@ -154,11 +157,16 @@ exports.editWorkerProfile = async (req, res) => {
 
     const { name, email, city, dailyRate, aadhaarNumber, experience, skills } = req.body;
     const updateData = {};
+    let documentsUpdated = false;
+
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (city) updateData.city = city;
     if (dailyRate) updateData.dailyRate = dailyRate;
-    if (aadhaarNumber) updateData.aadhaarNumber = aadhaarNumber;
+    if (aadhaarNumber) {
+      updateData.aadhaarNumber = aadhaarNumber;
+      documentsUpdated = true;
+    }
     if (experience) updateData.experience = experience;
     if (skills) updateData.skills = typeof skills === 'string' ? JSON.parse(skills) : skills;
 
@@ -170,14 +178,29 @@ exports.editWorkerProfile = async (req, res) => {
       if (req.files.aadhaarFrontImage) {
         if (user.aadhaarFrontImage) fs.unlink(user.aadhaarFrontImage, () => {});
         updateData.aadhaarFrontImage = req.files.aadhaarFrontImage[0].path;
+        documentsUpdated = true;
       }
       if (req.files.aadhaarBackImage) {
         if (user.aadhaarBackImage) fs.unlink(user.aadhaarBackImage, () => {});
         updateData.aadhaarBackImage = req.files.aadhaarBackImage[0].path;
+        documentsUpdated = true;
+      }
+      if (req.files.certificateImages) {
+        // Replace certificate list with newly uploaded certificates
+        updateData.certificates = req.files.certificateImages.map(file => file.path);
+        documentsUpdated = true;
       }
     }
 
     Object.assign(user, updateData);
+
+    // If worker re-uploads documents, reset admin verification state
+    if (documentsUpdated) {
+      user.verificationStatus = 'pending';
+      user.verificationRejectedReason = null;
+      user.verificationReviewedAt = null;
+    }
+
     await user.save();
 
     res.json({
@@ -272,7 +295,11 @@ exports.getProfile = async (req, res) => {
         gstNumber: user.gstNumber,
         licenseNumber: user.licenseNumber,
         projectTypes: user.projectTypes,
+        certificates: user.certificates,
         isVerified: user.isVerified,
+        verificationStatus: user.verificationStatus,
+        verificationRejectedReason: user.verificationRejectedReason,
+        verificationReviewedAt: user.verificationReviewedAt,
         createdAt: user.createdAt
       }
     });

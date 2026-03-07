@@ -64,6 +64,12 @@ const userSchema = new mongoose.Schema({
     default:null,
   },
   // Worker-specific fields
+  age: {
+    type: Number,
+    min: [18, 'Age must be at least 18'],
+    max: [100, 'Age must be less than 100'],
+    default: null,
+  },
   city: {
     type: String,
     trim: true,
@@ -146,6 +152,23 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false,
+  },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'rejected'],
+    default: 'pending',
+  },
+  verificationRejectedReason: {
+    type: String,
+    default: null,
+  },
+  verificationReviewedAt: {
+    type: Date,
+    default: null,
+  },
+  certificates: {
+    type: [String],
+    default: [],
   },
   otp: {
     type: String,

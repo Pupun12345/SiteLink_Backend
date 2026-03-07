@@ -25,13 +25,15 @@ router.put('/customer/edit', protect, upload.fields([
 router.post('/worker/create', protect, upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'aadhaarFrontImage', maxCount: 1 },
-  { name: 'aadhaarBackImage', maxCount: 1 }
+  { name: 'aadhaarBackImage', maxCount: 1 },
+  { name: 'certificateImages', maxCount: 5 },
 ]), createWorkerProfile);
 
 router.put('/worker/edit', protect, upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'aadhaarFrontImage', maxCount: 1 },
-  { name: 'aadhaarBackImage', maxCount: 1 }
+  { name: 'aadhaarBackImage', maxCount: 1 },
+  { name: 'certificateImages', maxCount: 5 },
 ]), editWorkerProfile);
 
 // Vendor Profile Routes
