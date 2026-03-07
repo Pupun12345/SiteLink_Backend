@@ -208,11 +208,20 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Check if user is verified
+    // Check if user is verified by OTP
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
         message: 'Please verify your account with OTP before logging in',
+      });
+    }
+
+    // Worker accounts require admin document verification
+    if (user.userType === 'worker' && user.verificationStatus !== 'verified') {
+      return res.status(403).json({
+        success: false,
+        message: 'Worker account pending admin verification',
+        verificationStatus: user.verificationStatus,
       });
     }
 
