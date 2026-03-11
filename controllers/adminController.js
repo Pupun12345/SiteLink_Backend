@@ -111,6 +111,9 @@ exports.rejectWorker = async (req, res) => {
   } catch (error) {
     console.error('rejectWorker error:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 const Subscription = require('../models/Subscription');
 const Transaction = require('../models/Transaction');
 const Requirement = require('../models/Requirement');

@@ -4,19 +4,6 @@ const {
   getWorkerDetails,
   verifyWorker,
   rejectWorker,
-} = require('../controllers/adminController');
-const { protect, adminOnly } = require('../middleware/auth');
-
-const router = express.Router();
-
-// Admin-only worker verification endpoints
-router.get('/workers/pending', protect, adminOnly, getPendingWorkers);
-router.get('/workers/:id', protect, adminOnly, getWorkerDetails);
-router.put('/workers/:id/verify', protect, adminOnly, verifyWorker);
-router.put('/workers/:id/reject', protect, adminOnly, rejectWorker);
-const router = express.Router();
-const { protect, adminOnly } = require('../middleware/auth');
-const {
   getTotalWorkers,
   getTotalVendors,
   getPendingVerifications,
@@ -27,6 +14,9 @@ const {
   verifyUser,
   getAllUsers,
 } = require('../controllers/adminController');
+const { protect, adminOnly } = require('../middleware/auth');
+
+const router = express.Router();
 
 // All routes require authentication and admin role
 router.use(protect);
@@ -34,6 +24,12 @@ router.use(adminOnly);
 
 // Dashboard overview
 router.get('/dashboard', getDashboardStats);
+
+// Admin-only worker verification endpoints
+router.get('/workers/pending', getPendingWorkers);
+router.get('/workers/:id', getWorkerDetails);
+router.put('/workers/:id/verify', verifyWorker);
+router.put('/workers/:id/reject', rejectWorker);
 
 // Stats routes
 router.get('/stats/workers', getTotalWorkers);
