@@ -24,6 +24,11 @@ exports.getWorkerDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     const worker = await User.findById(id).select(
       'name age phone experience city dailyRate profileImage aadhaarFrontImage aadhaarBackImage certificates verificationStatus isVerified skills userType'
     );
@@ -44,6 +49,11 @@ exports.verifyWorker = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     const worker = await User.findById(id);
 
     if (!worker || worker.userType !== 'worker') {
@@ -56,8 +66,6 @@ exports.verifyWorker = async (req, res) => {
     worker.verificationReviewedAt = new Date();
 
     await worker.save({ validateModifiedOnly: true });
-
-    // TODO: send notification to worker (email/SMS)
 
     return res.json({
       success: true,
@@ -80,6 +88,11 @@ exports.rejectWorker = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     if (!reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({ success: false, message: 'Rejection reason is required' });
     }
@@ -96,8 +109,6 @@ exports.rejectWorker = async (req, res) => {
     worker.verificationReviewedAt = new Date();
 
     await worker.save({ validateModifiedOnly: true });
-
-    // TODO: send notification to worker (email/SMS) with rejection reason
 
     return res.json({
       success: true,
@@ -163,7 +174,12 @@ exports.getVendorDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-  const vendor = await User.findById(id).select(
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
+    const vendor = await User.findById(id).select(
       'companyName ownerName phone email city gstNumber panNumber licenseNumber panCardImage companyLogo verificationStatus isVerified projectTypes userType adminRating adminRatingComment ratedAt'
     );
 
@@ -183,6 +199,11 @@ exports.verifyVendor = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
     const vendor = await User.findById(id);
 
     if (!vendor || vendor.userType !== 'vendor') {
@@ -195,8 +216,6 @@ exports.verifyVendor = async (req, res) => {
     vendor.verificationReviewedAt = new Date();
 
     await vendor.save({ validateModifiedOnly: true });
-
-    // TODO: send notification to vendor (email/SMS)
 
     return res.json({
       success: true,
@@ -219,6 +238,11 @@ exports.rejectVendor = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
     if (!reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({ success: false, message: 'Rejection reason is required' });
     }
@@ -235,8 +259,6 @@ exports.rejectVendor = async (req, res) => {
     vendor.verificationReviewedAt = new Date();
 
     await vendor.save({ validateModifiedOnly: true });
-
-    // TODO: send notification to vendor (email/SMS) with rejection reason
 
     return res.json({
       success: true,
@@ -259,7 +281,11 @@ exports.rateVendor = async (req, res) => {
     const { id } = req.params;
     let { rating, comment } = req.body;
 
-    // Convert rating to number if it's a string
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
     rating = parseInt(rating, 10);
 
     if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
@@ -302,19 +328,19 @@ exports.rateVendor = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const { userType, status, page = 1, limit = 10 } = req.query;
-    
+
     const query = {};
-    
+
     if (userType && userType !== 'all') {
       query.userType = userType;
     }
-    
+
     if (status && status !== 'all') {
       query.verificationStatus = status;
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const users = await User.find(query)
       .select('name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience')
       .sort({ createdAt: -1 })
@@ -323,7 +349,6 @@ exports.getAllUsers = async (req, res) => {
 
     const total = await User.countDocuments(query);
 
-    // Transform data to match frontend expectations
     const transformedUsers = users.map(user => ({
       _id: user._id,
       name: user.userType === 'vendor' ? user.companyName : user.name,
@@ -331,8 +356,8 @@ exports.getAllUsers = async (req, res) => {
       type: user.userType.charAt(0).toUpperCase() + user.userType.slice(1),
       status: user.verificationStatus.charAt(0).toUpperCase() + user.verificationStatus.slice(1),
       join: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
-      plan: 'Basic', // Default plan, could be extended
-      lastActive: 'Recently', // Could be calculated from last login
+      plan: 'Basic',
+      lastActive: 'Recently',
       avatar: user.profileImage || (user.userType === 'vendor' ? user.companyLogo : 'https://randomuser.me/api/portraits/lego/1.jpg'),
       phone: user.phone,
       city: user.city,
@@ -359,6 +384,11 @@ exports.getUserDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
     const user = await User.findById(id).select(
       'name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience age dailyRate aadhaarFrontImage aadhaarBackImage certificates skills gstNumber panNumber licenseNumber panCardImage companyLogo projectTypes adminRating adminRatingComment ratedAt'
     );
@@ -367,7 +397,6 @@ exports.getUserDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Transform data to match frontend expectations
     const transformedUser = {
       _id: user._id,
       name: user.userType === 'vendor' ? user.companyName : user.name,
@@ -384,13 +413,12 @@ exports.getUserDetails = async (req, res) => {
       role: user.role || (user.userType === 'vendor' ? 'Vendor' : 'Worker'),
       experience: user.experience,
       verified: user.isVerified,
-      twoFactor: false, // Default, could be extended
-      lastPasswordChange: 'Unknown', // Could be extended
+      twoFactor: false,
+      lastPasswordChange: 'Unknown',
       accountStatus: user.verificationStatus.toUpperCase(),
       department: user.userType === 'vendor' ? 'Vendor' : 'Worker',
       location: user.city ? `${user.city}, India` : 'Unknown',
       employeeId: `SL-${user._id.toString().slice(-4)}`,
-      // Additional fields for workers
       ...(user.userType === 'worker' && {
         age: user.age,
         dailyRate: user.dailyRate,
@@ -399,7 +427,6 @@ exports.getUserDetails = async (req, res) => {
         certificates: user.certificates,
         skills: user.skills
       }),
-      // Additional fields for vendors
       ...(user.userType === 'vendor' && {
         ownerName: user.ownerName,
         gstNumber: user.gstNumber,

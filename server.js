@@ -3,11 +3,11 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
-const skillsRoutes = require('./routes/skillsRoutes');      
-const statsRoutes=require('./routes/statsRoutes')
-const jobRoutes = require("./routes/jobRoutes");
+const skillsRoutes = require('./routes/skillsRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 const searchRoutes = require('./routes/searchRoutes');
-
+const adminRoutes = require('./routes/adminRoutes');
 
 // Load env variables
 dotenv.config();
@@ -27,15 +27,14 @@ app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/skills',skillsRoutes);
+app.use('/api/skills', skillsRoutes);
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/help-support', require('./routes/helpSupportRoutes'));
 app.use('/api/jobs', jobRoutes);
 app.use('/api/legal', require('./routes/legalRoutes'));
-app.use('/api/stats',statsRoutes );
-app.use('/api/admin', require('./routes/adminRoutes'));
-
+app.use('/api/stats', statsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Root route
 app.get('/', (req, res) => {

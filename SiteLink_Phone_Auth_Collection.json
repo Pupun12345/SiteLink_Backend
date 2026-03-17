@@ -1,10 +1,10 @@
 {
   "info": {
     "name": "SiteLink Complete API",
-    "description": "Complete SiteLink Backend API with Phone Authentication, OTP Verification, Image Upload, Search & Filter functionality",
+    "description": "Complete SiteLink Backend API with Phone Authentication, OTP Verification, Image Upload, Search & Filter, and Admin Dashboard functionality",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "sitelink-phone-auth-2026",
-    "version": "3.0.0"
+    "version": "4.0.0"
   },
   "item": [
     {
@@ -1258,6 +1258,404 @@
         }
       ],
       "description": "Search and filter APIs for workers, vendors, jobs, and support tickets with pagination and sorting"
+    },
+    {
+      "name": "8. Admin Dashboard APIs",
+      "item": [
+        {
+          "name": "Dashboard Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/dashboard",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "dashboard"]
+            },
+            "description": "Get complete overview of all key metrics: total workers, vendors, customers, pending verifications, active subscriptions, requirements, and revenue. Real-time update."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Total Workers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/stats/workers",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "stats", "workers"]
+            },
+            "description": "Get total workers count with verified count and new workers this month. Real-time update."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Total Vendors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/stats/vendors",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "stats", "vendors"]
+            },
+            "description": "Get total vendors count with verified count and new vendors this month. Real-time update."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Pending Verifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/verifications?status=pending&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "verifications"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by status: pending or verified"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Get list of users pending verification (workers with Aadhaar, vendors with GST/PAN). Real-time update."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isVerified\": true\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/admin/verify/:userId",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "verify", ":userId"]
+            },
+            "description": "Approve or reject user verification. Replace :userId with actual user MongoDB ObjectId. Set isVerified to true to approve, false to reject."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/subscriptions?status=active&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "subscriptions"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: active, inactive, expired, cancelled"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Get list of subscriptions with total revenue calculation. Hourly update frequency."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue (Current Month)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/revenue?period=month",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "revenue"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "month",
+                  "description": "Time period: today, week, month, year, all"
+                }
+              ]
+            },
+            "description": "Get revenue for current month with breakdown by transaction type and daily revenue chart. Daily update frequency."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue (Specific Month)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/revenue?period=month&year=2024&month=3",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "revenue"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "month",
+                  "description": "Time period"
+                },
+                {
+                  "key": "year",
+                  "value": "2024",
+                  "description": "Specific year"
+                },
+                {
+                  "key": "month",
+                  "value": "3",
+                  "description": "Specific month (1-12)"
+                }
+              ]
+            },
+            "description": "Get revenue for a specific month with detailed breakdown."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue (This Week)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/revenue?period=week",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "revenue"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "week",
+                  "description": "Last 7 days"
+                }
+              ]
+            },
+            "description": "Get revenue for the past week (last 7 days)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Requirements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/stats/requirements?status=active&page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "stats", "requirements"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: active, in_progress, completed, cancelled"
+                },
+                {
+                  "key": "category",
+                  "value": null,
+                  "description": "Filter by category: construction, renovation, maintenance, interior, other",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Get active customer requirements with vendor responses. Includes stats by status and category. Real-time update."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text",
+                "description": "Admin JWT token required"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/admin/users?userType=worker&isVerified=true&page=1&limit=20",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "admin", "users"],
+              "query": [
+                {
+                  "key": "userType",
+                  "value": "worker",
+                  "description": "Filter by type: worker, vendor, customer",
+                  "disabled": true
+                },
+                {
+                  "key": "isVerified",
+                  "value": "true",
+                  "description": "Filter by verification status: true or false",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": null,
+                  "description": "Search across name, phone, email, company",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Field to sort by",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "Sort order: asc or desc",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default: 20)"
+                }
+              ]
+            },
+            "description": "Get all users with comprehensive filtering and search. Useful for user management."
+          },
+          "response": []
+        }
+      ],
+      "description": "Admin Dashboard APIs for monitoring and managing the platform. All endpoints require admin authentication and provide real-time or near real-time data."
     }
   ],
   "variable": [
