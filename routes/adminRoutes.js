@@ -4,15 +4,14 @@ const {
   getWorkerDetails,
   verifyWorker,
   rejectWorker,
-  getTotalWorkers,
-  getTotalVendors,
-  getPendingVerifications,
-  getSubscriptions,
-  getRevenue,
-  getActiveRequirements,
-  getDashboardStats,
-  verifyUser,
+  getPendingVendors,
+  getVendors,
+  getVendorDetails,
+  verifyVendor,
+  rejectVendor,
+  rateVendor,
   getAllUsers,
+  getUserDetails,
 } = require('../controllers/adminController');
 const { protect, adminOnly } = require('../middleware/auth');
 
@@ -22,8 +21,9 @@ const router = express.Router();
 router.use(protect);
 router.use(adminOnly);
 
-// Dashboard overview
-router.get('/dashboard', getDashboardStats);
+// Admin-only user management
+router.get('/users', getAllUsers);
+router.get('/users/:id', getUserDetails);
 
 // Admin-only worker verification endpoints
 router.get('/workers/pending', getPendingWorkers);
@@ -31,22 +31,12 @@ router.get('/workers/:id', getWorkerDetails);
 router.put('/workers/:id/verify', verifyWorker);
 router.put('/workers/:id/reject', rejectWorker);
 
-// Stats routes
-router.get('/stats/workers', getTotalWorkers);
-router.get('/stats/vendors', getTotalVendors);
-router.get('/stats/requirements', getActiveRequirements);
-
-// Verification routes
-router.get('/verifications', getPendingVerifications);
-router.put('/verify/:userId', verifyUser);
-
-// Subscription routes
-router.get('/subscriptions', getSubscriptions);
-
-// Revenue routes
-router.get('/revenue', getRevenue);
-
-// User management routes
-router.get('/users', getAllUsers);
+// Admin-only vendor verification endpoints
+router.get('/vendors/pending', getPendingVendors);
+router.get('/vendors', getVendors);
+router.get('/vendors/:id', getVendorDetails);
+router.put('/vendors/:id/verify', verifyVendor);
+router.put('/vendors/:id/reject', rejectVendor);
+router.put('/vendors/:id/rate', rateVendor);
 
 module.exports = router;

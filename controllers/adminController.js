@@ -24,8 +24,13 @@ exports.getWorkerDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     const worker = await User.findById(id).select(
-      'name age phone experience city dailyRate profileImage aadhaarFrontImage aadhaarBackImage certificates verificationStatus isVerified skills'
+      'name age phone experience city dailyRate profileImage aadhaarFrontImage aadhaarBackImage certificates verificationStatus isVerified skills userType'
     );
 
     if (!worker || worker.userType !== 'worker') {
@@ -44,6 +49,11 @@ exports.verifyWorker = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     const worker = await User.findById(id);
 
     if (!worker || worker.userType !== 'worker') {
@@ -56,8 +66,6 @@ exports.verifyWorker = async (req, res) => {
     worker.verificationReviewedAt = new Date();
 
     await worker.save({ validateModifiedOnly: true });
-
-    // TODO: send notification to worker (email/SMS)
 
     return res.json({
       success: true,
@@ -80,6 +88,11 @@ exports.rejectWorker = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid worker ID format' });
+    }
+
     if (!reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({ success: false, message: 'Rejection reason is required' });
     }
@@ -97,8 +110,6 @@ exports.rejectWorker = async (req, res) => {
 
     await worker.save({ validateModifiedOnly: true });
 
-    // TODO: send notification to worker (email/SMS) with rejection reason
-
     return res.json({
       success: true,
       message: 'Worker verification rejected',
@@ -114,569 +125,325 @@ exports.rejectWorker = async (req, res) => {
   }
 };
 
-const Subscription = require('../models/Subscription');
-const Transaction = require('../models/Transaction');
-const Requirement = require('../models/Requirement');
-
-// @desc    Get total workers count
-// @route   GET /api/admin/stats/workers
-// @access  Private/Admin
-exports.getTotalWorkers = async (req, res) => {
+// Get list of vendors pending document verification
+exports.getPendingVendors = async (req, res) => {
   try {
-    const totalWorkers = await User.countDocuments({ userType: 'worker' });
-    
-    // Additional stats
-    const verifiedWorkers = await User.countDocuments({ 
-      userType: 'worker', 
-      isVerified: true 
-    });
-    
-    const newWorkersThisMonth = await User.countDocuments({
-      userType: 'worker',
-      createdAt: {
-        $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        total: totalWorkers,
-        verified: verifiedWorkers,
-        newThisMonth: newWorkersThisMonth,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching worker stats',
-      error: error.message,
-    });
-  }
-};
-
-// @desc    Get total vendors count
-// @route   GET /api/admin/stats/vendors
-// @access  Private/Admin
-exports.getTotalVendors = async (req, res) => {
-  try {
-    const totalVendors = await User.countDocuments({ userType: 'vendor' });
-    
-    // Additional stats
-    const verifiedVendors = await User.countDocuments({ 
-      userType: 'vendor', 
-      isVerified: true 
-    });
-    
-    const newVendorsThisMonth = await User.countDocuments({
+    const vendors = await User.find({
       userType: 'vendor',
-      createdAt: {
-        $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      }
-    });
+      verificationStatus: 'pending',
+    }).select('companyName ownerName phone city companyLogo verificationStatus createdAt email gstNumber');
 
-    res.status(200).json({
+    return res.json({
       success: true,
+      count: vendors.length,
+      data: vendors,
+    });
+  } catch (error) {
+    console.error('getPendingVendors error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get list of vendors optionally filtered by verification status
+exports.getVendors = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = { userType: 'vendor' };
+
+    if (status && status !== 'all') {
+      query.verificationStatus = status;
+    }
+
+    const vendors = await User.find(query).select(
+      'companyName ownerName phone city companyLogo verificationStatus createdAt email gstNumber adminRating projectTypes panCardImage'
+    );
+
+    return res.json({
+      success: true,
+      count: vendors.length,
+      data: vendors,
+    });
+  } catch (error) {
+    console.error('getVendors error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get vendor details (for verification screen)
+exports.getVendorDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
+    const vendor = await User.findById(id).select(
+      'companyName ownerName phone email city gstNumber panNumber licenseNumber panCardImage companyLogo verificationStatus isVerified projectTypes userType adminRating adminRatingComment ratedAt'
+    );
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    return res.json({ success: true, data: vendor });
+  } catch (error) {
+    console.error('getVendorDetails error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Verify vendor documents
+exports.verifyVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    vendor.verificationStatus = 'verified';
+    vendor.isVerified = true;
+    vendor.verificationRejectedReason = null;
+    vendor.verificationReviewedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: 'Vendor verified successfully',
       data: {
-        total: totalVendors,
-        verified: verifiedVendors,
-        newThisMonth: newVendorsThisMonth,
+        id: vendor._id,
+        verificationStatus: vendor.verificationStatus,
+        isVerified: vendor.isVerified,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching vendor stats',
-      error: error.message,
-    });
+    console.error('verifyVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// @desc    Get pending verifications
-// @route   GET /api/admin/verifications?status=pending
-// @access  Private/Admin
-exports.getPendingVerifications = async (req, res) => {
+// Reject vendor verification with a reason
+exports.rejectVendor = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
-    let filter = {};
-    
-    // Filter by verification status
-    if (status === 'pending') {
-      filter.isVerified = false;
-      filter.$or = [
-        { userType: 'worker', aadhaarNumber: { $ne: null } },
-        { userType: 'vendor', gstNumber: { $ne: null } },
-        { userType: 'vendor', panNumber: { $ne: null } }
-      ];
-    } else if (status === 'verified') {
-      filter.isVerified = true;
-    }
-    
-    const skip = (page - 1) * limit;
-    
-    const verifications = await User.find(filter)
-      .select('name phone email userType isVerified aadhaarNumber gstNumber panNumber companyName createdAt')
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip(skip);
-    
-    const total = await User.countDocuments(filter);
-    
-    res.status(200).json({
-      success: true,
-      count: verifications.length,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      data: verifications,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching verifications',
-      error: error.message,
-    });
-  }
-};
+    const { id } = req.params;
+    const { reason } = req.body;
 
-// @desc    Get active subscriptions
-// @route   GET /api/admin/subscriptions?status=active
-// @access  Private/Admin
-exports.getSubscriptions = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
-    let filter = {};
-    
-    if (status) {
-      filter.status = status;
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
     }
-    
-    // Additional filter for active subscriptions (not expired)
-    if (status === 'active') {
-      filter.endDate = { $gte: new Date() };
-    }
-    
-    const skip = (page - 1) * limit;
-    
-    const subscriptions = await Subscription.find(filter)
-      .populate('user', 'name phone email userType companyName')
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip(skip);
-    
-    const total = await Subscription.countDocuments(filter);
-    
-    // Calculate total revenue from active subscriptions
-    const revenueStats = await Subscription.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$amount' },
-        },
-      },
-    ]);
-    
-    res.status(200).json({
-      success: true,
-      count: subscriptions.length,
-      total,
-      totalRevenue: revenueStats.length > 0 ? revenueStats[0].totalRevenue : 0,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      data: subscriptions,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching subscriptions',
-      error: error.message,
-    });
-  }
-};
 
-// @desc    Get total revenue
-// @route   GET /api/admin/revenue?period=month
-// @access  Private/Admin
-exports.getRevenue = async (req, res) => {
-  try {
-    const { period = 'month', year, month } = req.query;
-    
-    let startDate, endDate;
-    const now = new Date();
-    
-    // Calculate date range based on period
-    switch (period) {
-      case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        break;
-        
-      case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        endDate = new Date();
-        break;
-        
-      case 'month':
-        if (year && month) {
-          startDate = new Date(year, month - 1, 1);
-          endDate = new Date(year, month, 1);
-        } else {
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        }
-        break;
-        
-      case 'year':
-        if (year) {
-          startDate = new Date(year, 0, 1);
-          endDate = new Date(year, 12, 1);
-        } else {
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = new Date(now.getFullYear() + 1, 0, 1);
-        }
-        break;
-        
-      case 'all':
-        startDate = new Date(0); // Beginning of time
-        endDate = new Date();
-        break;
-        
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
     }
-    
-    // Get revenue from transactions
-    const revenueData = await Transaction.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          createdAt: {
-            $gte: startDate,
-            $lt: endDate,
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$amount' },
-          totalTransactions: { $sum: 1 },
-          avgTransaction: { $avg: '$amount' },
-        },
-      },
-    ]);
-    
-    // Get revenue breakdown by type
-    const revenueByType = await Transaction.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          createdAt: {
-            $gte: startDate,
-            $lt: endDate,
-          },
-        },
-      },
-      {
-        $group: {
-          _id: '$type',
-          amount: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-    
-    // Get daily revenue for the period (for charts)
-    const dailyRevenue = await Transaction.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          createdAt: {
-            $gte: startDate,
-            $lt: endDate,
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
-          },
-          revenue: { $sum: '$amount' },
-          transactions: { $sum: 1 },
-        },
-      },
-      { $sort: { '_id': 1 } },
-    ]);
-    
-    res.status(200).json({
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    vendor.verificationStatus = 'rejected';
+    vendor.isVerified = false;
+    vendor.verificationRejectedReason = reason.trim();
+    vendor.verificationReviewedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    return res.json({
       success: true,
-      period,
-      startDate,
-      endDate,
+      message: 'Vendor verification rejected',
       data: {
-        summary: revenueData.length > 0 ? revenueData[0] : {
-          totalRevenue: 0,
-          totalTransactions: 0,
-          avgTransaction: 0,
-        },
-        byType: revenueByType,
-        daily: dailyRevenue,
+        id: vendor._id,
+        verificationStatus: vendor.verificationStatus,
+        rejectionReason: vendor.verificationRejectedReason,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching revenue',
-      error: error.message,
-    });
+    console.error('rejectVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// @desc    Get active requirements
-// @route   GET /api/admin/stats/requirements
-// @access  Private/Admin
-exports.getActiveRequirements = async (req, res) => {
+// Rate vendor (admin only)
+exports.rateVendor = async (req, res) => {
   try {
-    const { status, category, page = 1, limit = 10 } = req.query;
-    
-    let filter = {};
-    
-    if (status) {
-      filter.status = status;
-    } else {
-      // By default, show active requirements
-      filter.status = 'active';
-    }
-    
-    if (category) {
-      filter.category = category;
-    }
-    
-    const skip = (page - 1) * limit;
-    
-    const requirements = await Requirement.find(filter)
-      .populate('user', 'name phone email userType')
-      .populate('responses.vendor', 'name companyName phone')
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip(skip);
-    
-    const total = await Requirement.countDocuments(filter);
-    
-    // Get stats by status
-    const statsByStatus = await Requirement.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-    
-    // Get stats by category
-    const statsByCategory = await Requirement.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-    
-    res.status(200).json({
-      success: true,
-      count: requirements.length,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      stats: {
-        byStatus: statsByStatus,
-        byCategory: statsByCategory,
-      },
-      data: requirements,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching requirements',
-      error: error.message,
-    });
-  }
-};
+    const { id } = req.params;
+    let { rating, comment } = req.body;
 
-// @desc    Get dashboard overview stats
-// @route   GET /api/admin/dashboard
-// @access  Private/Admin
-exports.getDashboardStats = async (req, res) => {
-  try {
-    // Get all key metrics
-    const [
-      totalWorkers,
-      totalVendors,
-      totalCustomers,
-      pendingVerifications,
-      activeSubscriptions,
-      activeRequirements,
-      revenueThisMonth,
-    ] = await Promise.all([
-      User.countDocuments({ userType: 'worker' }),
-      User.countDocuments({ userType: 'vendor' }),
-      User.countDocuments({ userType: 'customer' }),
-      User.countDocuments({ 
-        isVerified: false,
-        $or: [
-          { userType: 'worker', aadhaarNumber: { $ne: null } },
-          { userType: 'vendor', gstNumber: { $ne: null } }
-        ]
-      }),
-      Subscription.countDocuments({ 
-        status: 'active',
-        endDate: { $gte: new Date() }
-      }),
-      Requirement.countDocuments({ status: 'active' }),
-      Transaction.aggregate([
-        {
-          $match: {
-            status: 'completed',
-            createdAt: {
-              $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$amount' },
-          },
-        },
-      ]),
-    ]);
-    
-    res.status(200).json({
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor ID format' });
+    }
+
+    rating = parseInt(rating, 10);
+
+    if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+    }
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    if (vendor.verificationStatus !== 'verified') {
+      return res.status(400).json({ success: false, message: 'Only verified vendors can be rated' });
+    }
+
+    vendor.adminRating = rating;
+    vendor.adminRatingComment = comment || null;
+    vendor.ratedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    return res.json({
       success: true,
+      message: 'Vendor rated successfully',
       data: {
-        totalWorkers,
-        totalVendors,
-        totalCustomers,
-        totalUsers: totalWorkers + totalVendors + totalCustomers,
-        pendingVerifications,
-        activeSubscriptions,
-        activeRequirements,
-        revenueThisMonth: revenueThisMonth.length > 0 ? revenueThisMonth[0].total : 0,
+        id: vendor._id,
+        adminRating: vendor.adminRating,
+        adminRatingComment: vendor.adminRatingComment,
+        ratedAt: vendor.ratedAt,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching dashboard stats',
-      error: error.message,
-    });
+    console.error('rateVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// @desc    Update user verification status
-// @route   PUT /api/admin/verify/:userId
-// @access  Private/Admin
-exports.verifyUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { isVerified } = req.body;
-    
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-    
-    user.isVerified = isVerified;
-    await user.save();
-    
-    res.status(200).json({
-      success: true,
-      message: `User ${isVerified ? 'verified' : 'unverified'} successfully`,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating verification status',
-      error: error.message,
-    });
-  }
-};
-
-// @desc    Get all users with filters
-// @route   GET /api/admin/users
-// @access  Private/Admin
+// Get all users for admin user management
 exports.getAllUsers = async (req, res) => {
   try {
-    const { 
-      userType, 
-      isVerified, 
-      search,
-      sortBy,
-      order,
-      page = 1, 
-      limit = 20 
-    } = req.query;
-    
-    let filter = {};
-    
-    if (userType) {
-      filter.userType = userType;
+    const { userType, status, page = 1, limit = 10 } = req.query;
+
+    const query = {};
+
+    if (userType && userType !== 'all') {
+      query.userType = userType;
     }
-    
-    if (isVerified !== undefined) {
-      filter.isVerified = isVerified === 'true';
+
+    if (status && status !== 'all') {
+      query.verificationStatus = status;
     }
-    
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { companyName: { $regex: search, $options: 'i' } },
-      ];
-    }
-    
-    let sort = {};
-    if (sortBy) {
-      sort[sortBy] = order === 'desc' ? -1 : 1;
-    } else {
-      sort.createdAt = -1;
-    }
-    
-    const skip = (page - 1) * limit;
-    
-    const users = await User.find(filter)
-      .select('-password -otp -otpExpire -otpAttempts -resetPasswordToken -resetPasswordExpire')
-      .sort(sort)
-      .limit(Number(limit))
-      .skip(skip);
-    
-    const total = await User.countDocuments(filter);
-    
-    res.status(200).json({
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const users = await User.find(query)
+      .select('name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments(query);
+
+    const transformedUsers = users.map(user => ({
+      _id: user._id,
+      name: user.userType === 'vendor' ? user.companyName : user.name,
+      email: user.email || '',
+      type: user.userType.charAt(0).toUpperCase() + user.userType.slice(1),
+      status: user.verificationStatus.charAt(0).toUpperCase() + user.verificationStatus.slice(1),
+      join: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      plan: 'Basic',
+      lastActive: 'Recently',
+      avatar: user.profileImage || (user.userType === 'vendor' ? user.companyLogo : 'https://randomuser.me/api/portraits/lego/1.jpg'),
+      phone: user.phone,
+      city: user.city,
+      role: user.role || (user.userType === 'vendor' ? 'Vendor' : 'Worker'),
+      experience: user.experience
+    }));
+
+    return res.json({
       success: true,
-      count: users.length,
+      count: transformedUsers.length,
       total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      data: users,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      data: transformedUsers,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching users',
-      error: error.message,
-    });
+    console.error('getAllUsers error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get user details for admin user profile view
+exports.getUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(id).select(
+      'name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience age dailyRate aadhaarFrontImage aadhaarBackImage certificates skills gstNumber panNumber licenseNumber panCardImage companyLogo projectTypes adminRating adminRatingComment ratedAt'
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const transformedUser = {
+      _id: user._id,
+      name: user.userType === 'vendor' ? user.companyName : user.name,
+      email: user.email || '',
+      phone: user.phone,
+      userType: user.userType,
+      type: user.userType.charAt(0).toUpperCase() + user.userType.slice(1),
+      status: user.verificationStatus.charAt(0).toUpperCase() + user.verificationStatus.slice(1),
+      join: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      plan: 'Basic',
+      lastActive: 'Recently',
+      avatar: user.profileImage || (user.userType === 'vendor' ? user.companyLogo : 'https://randomuser.me/api/portraits/lego/1.jpg'),
+      city: user.city,
+      role: user.role || (user.userType === 'vendor' ? 'Vendor' : 'Worker'),
+      experience: user.experience,
+      verified: user.isVerified,
+      twoFactor: false,
+      lastPasswordChange: 'Unknown',
+      accountStatus: user.verificationStatus.toUpperCase(),
+      department: user.userType === 'vendor' ? 'Vendor' : 'Worker',
+      location: user.city ? `${user.city}, India` : 'Unknown',
+      employeeId: `SL-${user._id.toString().slice(-4)}`,
+      ...(user.userType === 'worker' && {
+        age: user.age,
+        dailyRate: user.dailyRate,
+        aadhaarFrontImage: user.aadhaarFrontImage,
+        aadhaarBackImage: user.aadhaarBackImage,
+        certificates: user.certificates,
+        skills: user.skills
+      }),
+      ...(user.userType === 'vendor' && {
+        ownerName: user.ownerName,
+        gstNumber: user.gstNumber,
+        panNumber: user.panNumber,
+        licenseNumber: user.licenseNumber,
+        panCardImage: user.panCardImage,
+        companyLogo: user.companyLogo,
+        projectTypes: user.projectTypes,
+        adminRating: user.adminRating,
+        adminRatingComment: user.adminRatingComment,
+        ratedAt: user.ratedAt
+      })
+    };
+
+    return res.json({ success: true, data: transformedUser });
+  } catch (error) {
+    console.error('getUserDetails error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
