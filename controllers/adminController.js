@@ -25,7 +25,7 @@ exports.getWorkerDetails = async (req, res) => {
     const { id } = req.params;
 
     const worker = await User.findById(id).select(
-      'name age phone experience city dailyRate profileImage aadhaarFrontImage aadhaarBackImage certificates verificationStatus isVerified skills'
+      'name age phone experience city dailyRate profileImage aadhaarFrontImage aadhaarBackImage certificates verificationStatus isVerified skills userType'
     );
 
     if (!worker || worker.userType !== 'worker') {
@@ -110,6 +110,313 @@ exports.rejectWorker = async (req, res) => {
     });
   } catch (error) {
     console.error('rejectWorker error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get list of vendors pending document verification
+exports.getPendingVendors = async (req, res) => {
+  try {
+    const vendors = await User.find({
+      userType: 'vendor',
+      verificationStatus: 'pending',
+    }).select('companyName ownerName phone city companyLogo verificationStatus createdAt email gstNumber');
+
+    return res.json({
+      success: true,
+      count: vendors.length,
+      data: vendors,
+    });
+  } catch (error) {
+    console.error('getPendingVendors error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get list of vendors optionally filtered by verification status
+exports.getVendors = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = { userType: 'vendor' };
+
+    if (status && status !== 'all') {
+      query.verificationStatus = status;
+    }
+
+    const vendors = await User.find(query).select(
+      'companyName ownerName phone city companyLogo verificationStatus createdAt email gstNumber adminRating projectTypes panCardImage'
+    );
+
+    return res.json({
+      success: true,
+      count: vendors.length,
+      data: vendors,
+    });
+  } catch (error) {
+    console.error('getVendors error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get vendor details (for verification screen)
+exports.getVendorDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+  const vendor = await User.findById(id).select(
+      'companyName ownerName phone email city gstNumber panNumber licenseNumber panCardImage companyLogo verificationStatus isVerified projectTypes userType adminRating adminRatingComment ratedAt'
+    );
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    return res.json({ success: true, data: vendor });
+  } catch (error) {
+    console.error('getVendorDetails error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Verify vendor documents
+exports.verifyVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    vendor.verificationStatus = 'verified';
+    vendor.isVerified = true;
+    vendor.verificationRejectedReason = null;
+    vendor.verificationReviewedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    // TODO: send notification to vendor (email/SMS)
+
+    return res.json({
+      success: true,
+      message: 'Vendor verified successfully',
+      data: {
+        id: vendor._id,
+        verificationStatus: vendor.verificationStatus,
+        isVerified: vendor.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error('verifyVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Reject vendor verification with a reason
+exports.rejectVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+    }
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    vendor.verificationStatus = 'rejected';
+    vendor.isVerified = false;
+    vendor.verificationRejectedReason = reason.trim();
+    vendor.verificationReviewedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    // TODO: send notification to vendor (email/SMS) with rejection reason
+
+    return res.json({
+      success: true,
+      message: 'Vendor verification rejected',
+      data: {
+        id: vendor._id,
+        verificationStatus: vendor.verificationStatus,
+        rejectionReason: vendor.verificationRejectedReason,
+      },
+    });
+  } catch (error) {
+    console.error('rejectVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Rate vendor (admin only)
+exports.rateVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { rating, comment } = req.body;
+
+    // Convert rating to number if it's a string
+    rating = parseInt(rating, 10);
+
+    if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+    }
+
+    const vendor = await User.findById(id);
+
+    if (!vendor || vendor.userType !== 'vendor') {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    if (vendor.verificationStatus !== 'verified') {
+      return res.status(400).json({ success: false, message: 'Only verified vendors can be rated' });
+    }
+
+    vendor.adminRating = rating;
+    vendor.adminRatingComment = comment || null;
+    vendor.ratedAt = new Date();
+
+    await vendor.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: 'Vendor rated successfully',
+      data: {
+        id: vendor._id,
+        adminRating: vendor.adminRating,
+        adminRatingComment: vendor.adminRatingComment,
+        ratedAt: vendor.ratedAt,
+      },
+    });
+  } catch (error) {
+    console.error('rateVendor error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get all users for admin user management
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { userType, status, page = 1, limit = 10 } = req.query;
+    
+    const query = {};
+    
+    if (userType && userType !== 'all') {
+      query.userType = userType;
+    }
+    
+    if (status && status !== 'all') {
+      query.verificationStatus = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const users = await User.find(query)
+      .select('name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments(query);
+
+    // Transform data to match frontend expectations
+    const transformedUsers = users.map(user => ({
+      _id: user._id,
+      name: user.userType === 'vendor' ? user.companyName : user.name,
+      email: user.email || '',
+      type: user.userType.charAt(0).toUpperCase() + user.userType.slice(1),
+      status: user.verificationStatus.charAt(0).toUpperCase() + user.verificationStatus.slice(1),
+      join: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      plan: 'Basic', // Default plan, could be extended
+      lastActive: 'Recently', // Could be calculated from last login
+      avatar: user.profileImage || (user.userType === 'vendor' ? user.companyLogo : 'https://randomuser.me/api/portraits/lego/1.jpg'),
+      phone: user.phone,
+      city: user.city,
+      role: user.role || (user.userType === 'vendor' ? 'Vendor' : 'Worker'),
+      experience: user.experience
+    }));
+
+    return res.json({
+      success: true,
+      count: transformedUsers.length,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      data: transformedUsers,
+    });
+  } catch (error) {
+    console.error('getAllUsers error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get user details for admin user profile view
+exports.getUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id).select(
+      'name email phone userType verificationStatus isVerified createdAt profileImage companyName ownerName city role experience age dailyRate aadhaarFrontImage aadhaarBackImage certificates skills gstNumber panNumber licenseNumber panCardImage companyLogo projectTypes adminRating adminRatingComment ratedAt'
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Transform data to match frontend expectations
+    const transformedUser = {
+      _id: user._id,
+      name: user.userType === 'vendor' ? user.companyName : user.name,
+      email: user.email || '',
+      phone: user.phone,
+      userType: user.userType,
+      type: user.userType.charAt(0).toUpperCase() + user.userType.slice(1),
+      status: user.verificationStatus.charAt(0).toUpperCase() + user.verificationStatus.slice(1),
+      join: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      plan: 'Basic',
+      lastActive: 'Recently',
+      avatar: user.profileImage || (user.userType === 'vendor' ? user.companyLogo : 'https://randomuser.me/api/portraits/lego/1.jpg'),
+      city: user.city,
+      role: user.role || (user.userType === 'vendor' ? 'Vendor' : 'Worker'),
+      experience: user.experience,
+      verified: user.isVerified,
+      twoFactor: false, // Default, could be extended
+      lastPasswordChange: 'Unknown', // Could be extended
+      accountStatus: user.verificationStatus.toUpperCase(),
+      department: user.userType === 'vendor' ? 'Vendor' : 'Worker',
+      location: user.city ? `${user.city}, India` : 'Unknown',
+      employeeId: `SL-${user._id.toString().slice(-4)}`,
+      // Additional fields for workers
+      ...(user.userType === 'worker' && {
+        age: user.age,
+        dailyRate: user.dailyRate,
+        aadhaarFrontImage: user.aadhaarFrontImage,
+        aadhaarBackImage: user.aadhaarBackImage,
+        certificates: user.certificates,
+        skills: user.skills
+      }),
+      // Additional fields for vendors
+      ...(user.userType === 'vendor' && {
+        ownerName: user.ownerName,
+        gstNumber: user.gstNumber,
+        panNumber: user.panNumber,
+        licenseNumber: user.licenseNumber,
+        panCardImage: user.panCardImage,
+        companyLogo: user.companyLogo,
+        projectTypes: user.projectTypes,
+        adminRating: user.adminRating,
+        adminRatingComment: user.adminRatingComment,
+        ratedAt: user.ratedAt
+      })
+    };
+
+    return res.json({ success: true, data: transformedUser });
+  } catch (error) {
+    console.error('getUserDetails error:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

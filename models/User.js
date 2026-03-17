@@ -166,6 +166,20 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  adminRating: {
+    type: Number,
+    min: [1, 'Rating must be at least 1'],
+    max: [5, 'Rating must be at most 5'],
+    default: null,
+  },
+  adminRatingComment: {
+    type: String,
+    default: null,
+  },
+  ratedAt: {
+    type: Date,
+    default: null,
+  },
   certificates: {
     type: [String],
     default: [],
@@ -194,6 +208,14 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpire: {
     type: Date,
     select: false,
+  },
+  website: {
+    type: String,
+    default: null,
+  },
+  emergencyContact: {
+    type: String,
+    default: null,
   },
 
 });
