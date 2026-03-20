@@ -16,9 +16,13 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
     type: {
-      type: String, // Full-time, Part-time
-      enum: ['Full-time', 'Part-time'],
+      type: String,
+      enum: ['Full-time Contract', 'On-site', 'Offshore', 'Heavy Machinery', 'Contractual'],
       required: true,
+    },
+    quantity: {
+      type: String,
+      default: '1',
     },
     salary: {
       type: String,
@@ -27,11 +31,37 @@ const jobSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    skills: [
-      {
-        type: String,
-      },
-    ],
+    skills: [{
+      type: String,
+    }],
+    experience: {
+      type: String,
+      required: true,
+    },
+    equipment: [{
+      type: String,
+    }],
+    projectSite: {
+      type: String,
+      required: true,
+    },
+    address: {
+      type: String,
+      required: true,
+    },
+    mapImage: {
+      type: String,
+      default: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=800',
+    },
+    status: {
+      type: String,
+      enum: ['Open', 'Filled', 'Closed', 'Cancelled'],
+      default: 'Open',
+    },
+    applicationsCount: {
+      type: Number,
+      default: 0,
+    },
     postedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -39,5 +69,13 @@ const jobSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Generate job ID
+jobSchema.virtual('jobId').get(function() {
+  return `REQ-${this._id.toString().slice(-4).toUpperCase()}`;
+});
+
+// Include virtuals in JSON
+jobSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Job', jobSchema);
