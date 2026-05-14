@@ -1,0 +1,79 @@
+const express = require('express');
+const app = express();
+const dotenv = require('dotenv');
+const cors = require('cors');
+const connectDB = require('./config/database');
+const errorHandler = require('./middleware/errorHandler');
+const communityRoutes = require('./routes/communityRoutes');
+const { trackApiRequest } = require('./middleware/apiTracker');
+// const skillsRoutes = require('./routes/skillsRoutes');
+// const jobRoutes = require('./routes/jobRoutes');
+// const statsRoutes = require('./routes/statsRoutes');
+// const searchRoutes = require('./routes/searchRoutes');
+// const adminRoutes = require('./routes/adminRoutes');
+// const adminUserRoutes = require('./routes/adminUserRoutes');
+// const workerHomeRoutes = require('./routes/workerHomePage');
+// const systemRoutes = require('./routes/systemRoutes');
+// const notificationRoutes = require('./routes/notificationRoutes');
+// const platformSettingRoutes = require('./routes/platformSettingRoutes');
+
+dotenv.config();
+
+connectDB();
+
+// API Request Tracking Middleware
+app.use(trackApiRequest)
+app.use('/api', trackApiRequest);
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files (uploaded images)
+app.use('/uploads', express.static('uploads'));
+
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/profile', require('./routes/profileRoutes'));
+app.use('/api/community', communityRoutes);
+// app.use('/api/help-support', require('./routes/helpSupportRoutes'));
+// app.use('/api/jobs', jobRoutes);
+// app.use('/api/legal', require('./routes/legalRoutes'));
+// app.use('/api/stats', statsRoutes);
+// app.use('/api/search', searchRoutes);
+// app.use('/api/skills', skillsRoutes);
+// app.use('/api/admin', adminRoutes);
+// app.use('/api/admin-users', adminUserRoutes);
+// app.use('/api/worker', workerHomeRoutes);
+// app.use('/api/system', systemRoutes);
+// app.use('/api/notifications', notificationRoutes);
+// app.use('/api/platform-settings', platformSettingRoutes);
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'SiteLink API is running',
+    version: '1.0.0',
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+  });
+});
+
+// Error handler
+app.use(errorHandler);
+
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+
