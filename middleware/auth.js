@@ -53,6 +53,7 @@ exports.protect = async (req, res, next) => {
   }
 };
 
+
 // Authorize specific roles
 exports.authorize = (...roles) => {
   return (req, res, next) => {
@@ -73,3 +74,16 @@ exports.authorize = (...roles) => {
     next();
   };
 };
+
+exports.applicable = async (req, res, next) => {
+  const {id:applicantId}=req.user;
+
+  const user=await User.findById(applicantId);
+
+  if(user.userType!=='worker' || user.verificationStatus!=='verified'){
+    return res.status(403).json({
+      success: false,
+      message: 'Not allow to apply to job',
+    });
+  }
+}

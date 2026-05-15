@@ -9,6 +9,10 @@ const {
   approvePost,
   rejectPost,
   autoApprovePosts,
+  addComment,
+  updateComment,
+  deleteComment,
+  getCommentsByPost,
 } = require('../controllers/communityController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -24,5 +28,11 @@ router.put('/posts/:postId/like', protect, likeUnlikePost);
 
 // DELETE post
 router.delete('/posts/:postId', protect, deletePost);
+
+// Comment routes
+router.post('/posts/:id/comments', protect, addComment);
+router.put('/posts/:postId/comments/:commentId', protect, updateComment);
+router.delete('/posts/:postId/comments/:commentId', protect, deleteComment);
+router.get('/posts/:id/comments', getCommentsByPost);
 
 module.exports = router;

@@ -2,6 +2,109 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
+const STATES = [
+  { id: 1, name: 'Andhra Pradesh' },
+  { id: 2, name: 'Arunachal Pradesh' },
+  { id: 3, name: 'Assam' },
+  { id: 4, name: 'Bihar' },
+  { id: 5, name: 'Chhattisgarh' },
+  { id: 6, name: 'Goa' },
+  { id: 7, name: 'Gujarat' },
+  { id: 8, name: 'Haryana' },
+  { id: 9, name: 'Himachal Pradesh' },
+  { id: 10, name: 'Jharkhand' },
+  { id: 11, name: 'Karnataka' },
+  { id: 12, name: 'Kerala' },
+  { id: 13, name: 'Madhya Pradesh' },
+  { id: 14, name: 'Maharashtra' },
+  { id: 15, name: 'Manipur' },
+  { id: 16, name: 'Meghalaya' },
+  { id: 17, name: 'Mizoram' },
+  { id: 18, name: 'Nagaland' },
+  { id: 19, name: 'Odisha' },
+  { id: 20, name: 'Punjab' },
+  { id: 21, name: 'Rajasthan' },
+  { id: 22, name: 'Sikkim' },
+  { id: 23, name: 'Tamil Nadu' },
+  { id: 24, name: 'Telangana' },
+  { id: 25, name: 'Tripura' },
+  { id: 26, name: 'Uttar Pradesh' },
+  { id: 27, name: 'Uttarakhand' },
+  { id: 28, name: 'West Bengal' },
+  { id: 29, name: 'Delhi' },
+  { id: 30, name: 'Jammu & Kashmir' },
+];
+
+const CITIES = {
+  1:  ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati', 'Rajahmundry'],
+  2:  ['Itanagar', 'Naharlagun', 'Pasighat', 'Tawang', 'Ziro'],
+  3:  ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia'],
+  4:  ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga'],
+  5:  ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg', 'Rajnandgaon'],
+  6:  ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
+  7:  ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
+  8:  ['Faridabad', 'Gurugram', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar'],
+  9:  ['Shimla', 'Manali', 'Dharamshala', 'Solan', 'Mandi', 'Kullu'],
+  10: ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Deoghar', 'Hazaribagh'],
+  11: ['Bengaluru', 'Mysuru', 'Hubli', 'Mangaluru', 'Belagavi', 'Kalaburagi', 'Davangere'],
+  12: ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Palakkad', 'Alappuzha'],
+  13: ['Bhopal', 'Indore', 'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Rewa'],
+  14: ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Thane', 'Kolhapur'],
+  15: ['Imphal', 'Thoubal', 'Bishnupur', 'Churachandpur', 'Senapati'],
+  16: ['Shillong', 'Tura', 'Jowai', 'Nongstoin', 'Baghmara'],
+  17: ['Aizawl', 'Lunglei', 'Champhai', 'Serchhip', 'Kolasib'],
+  18: ['Kohima', 'Dimapur', 'Mokokchung', 'Tuensang', 'Wokha'],
+  19: ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri'],
+  20: ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali', 'Pathankot'],
+  21: ['Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Alwar', 'Bharatpur'],
+  22: ['Gangtok', 'Namchi', 'Gyalshing', 'Mangan', 'Rangpo'],
+  23: ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Vellore'],
+  24: ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Ramagundam'],
+  25: ['Agartala', 'Udaipur', 'Dharmanagar', 'Kailashahar', 'Belonia'],
+  26: ['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Meerut', 'Allahabad', 'Ghaziabad', 'Noida'],
+  27: ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani', 'Rudrapur', 'Rishikesh'],
+  28: ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Bardhaman'],
+  29: ['New Delhi', 'Dwarka', 'Rohini', 'Janakpuri', 'Laxmi Nagar', 'Saket', 'Pitampura'],
+  30: ['Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Sopore', 'Kathua'],
+};
+
+// @desc  Get all states
+// @route GET /api/profile/states
+exports.getStates = (req, res) => {
+  res.status(200).json({ success: true, data: STATES });
+};
+
+// @desc  Get cities by state id
+// @route GET /api/profile/cities/:stateId
+exports.getCitiesByState = (req, res) => {
+  const stateId = parseInt(req.params.stateId);
+  const state = STATES.find(s => s.id === stateId);
+
+  if (!state) {
+    return res.status(404).json({ success: false, message: 'State not found' });
+  }
+
+  const cities = (CITIES[stateId] || []).map((name, index) => ({ id: index + 1, name }));
+  res.status(200).json({ success: true, state: state.name, data: cities });
+};
+
+// @desc  Save workState and preferredCity to user by stateId and cityId
+// @route POST `/api/profile/location/:stateId/:cityId`
+exports.getLocationByIds = async (req, res) => {
+  const stateId = parseInt(req.params.stateId);
+  const cityId = parseInt(req.params.cityId);
+
+  const state = STATES.find(s => s.id === stateId);
+  if (!state) return res.status(404).json({ success: false, message: 'State not found' });
+
+  const cityName = (CITIES[stateId] || [])[cityId - 1];
+  if (!cityName) return res.status(404).json({ success: false, message: 'City not found' });
+
+  await User.findByIdAndUpdate(req.user.id, { workState: state.name, city: cityName });
+
+  res.status(200).json({ success: true, data: { workState: state.name, preferredCity: cityName } });
+};
+
 // Get Profile
 exports.getProfile = async (req, res) => {
   try {
@@ -69,7 +172,7 @@ exports.createWorkerProfile = async (req, res) => {
     //   }
     // }
 
-    const { name, dateOfBirth, gender, city, primarySkill, additionalSkills, totalExperience, experienceDescription, workState, preferredCity, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
+    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
 
     if (!primarySkill) {
       return res.status(400).json({ success: false, message: 'Primary skill is required' });
@@ -77,35 +180,22 @@ exports.createWorkerProfile = async (req, res) => {
 
     if (dateOfBirth) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
       if (!dateRegex.test(dateOfBirth)) {
-        return res.status(400).json({
-          success: false,
-          message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)"
-        });
+        return res.status(400).json({ success: false, message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)" });
       }
-
-      //if it's a real valid date
       const parsedDate = new Date(dateOfBirth);
-
       if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid date of birth"
-        });
+        return res.status(400).json({ success: false, message: "Invalid date of birth" });
       }
     }
 
     if (name) user.name = name;
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (gender) user.gender = gender;
-    if (city) user.city = city;
     if (primarySkill) user.primarySkill = primarySkill;
     if (additionalSkills) user.skills = typeof additionalSkills === 'string' ? JSON.parse(additionalSkills) : additionalSkills;
     if (totalExperience) user.experience = totalExperience;
     if (experienceDescription) user.experienceDescription = experienceDescription;
-    if (workState) user.workState = workState;
-    if (preferredCity) user.city = preferredCity;
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
@@ -140,9 +230,7 @@ exports.editWorkerProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { name, dateOfBirth, gender, city, primarySkill, additionalSkills, totalExperience, experienceDescription, workState, preferredCity, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
-    let documentsUpdated = false;
-
+    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
 
     if (!primarySkill) {
       return res.status(400).json({ success: false, message: 'Primary skill is required' });
@@ -150,35 +238,22 @@ exports.editWorkerProfile = async (req, res) => {
 
     if (dateOfBirth) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
       if (!dateRegex.test(dateOfBirth)) {
-        return res.status(400).json({
-          success: false,
-          message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)"
-        });
+        return res.status(400).json({ success: false, message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)" });
       }
-
-      //if it's a real valid date
       const parsedDate = new Date(dateOfBirth);
-
       if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid date of birth"
-        });
+        return res.status(400).json({ success: false, message: "Invalid date of birth" });
       }
     }
 
     if (name) user.name = name;
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (gender) user.gender = gender;
-    if (city) user.city = city;
     if (primarySkill) { user.primarySkill = primarySkill; user.role = primarySkill; }
     if (additionalSkills) user.skills = typeof additionalSkills === 'string' ? JSON.parse(additionalSkills) : additionalSkills;
     if (totalExperience) user.experience = totalExperience;
     if (experienceDescription) user.experienceDescription = experienceDescription;
-    if (workState) user.workState = workState;
-    if (preferredCity) user.city = preferredCity;
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
@@ -218,7 +293,7 @@ exports.createVendorProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { companyName, name, email, designation, city, workArea, gstNumber, whatsappNumber, website } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website } = req.body;
 
     if (!companyName) return res.status(400).json({ success: false, message: 'Company name is required' });
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
@@ -228,7 +303,6 @@ exports.createVendorProfile = async (req, res) => {
     if (name) user.name = name;
     if (email) user.email = email;
     if (designation) user.designation = designation;
-    if (city) user.city = city;
     if (workArea) user.workArea = workArea;
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
@@ -261,13 +335,12 @@ exports.editVendorProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { companyName, name, email, designation, city, workArea, gstNumber, whatsappNumber, website } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website } = req.body;
 
     if (companyName) user.companyName = companyName;
     if (name) user.name = name;
     if (email) user.email = email;
     if (designation) { user.designation = designation; user.role = designation; }
-    if (city) user.city = city;
     if (workArea) user.workArea = workArea;
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;

@@ -21,35 +21,26 @@ exports.register = async (req, res) => {
 
     const { phone } = req.body;
 
-
-    // Check if user already exists
-    const userExists = await User.findOne({ phone });
-
-    if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this phone number',
-        isExist:true,
-      });
-    }
-
-    // Generate OTP
     const otp = generateOTP();
     const otpExpire = getOTPExpiry();
 
+    const existingUser = await User.findOne({ phone });
 
-    // Create user data object
-    const userData = {
-      phone,
-      otp,
-      otpExpire,
-      otpAttempts: 0,
-      isPhoneVerified: false,
-    };
+    if (existingUser) {
+      existingUser.otp = otp;
+      existingUser.otpExpire = otpExpire;
+      existingUser.otpAttempts = 0;
+      await existingUser.save();
+      console.log(`OTP for +91${phone}: ${otp}`);
 
+      return res.status(200).json({
+        success: true,
+        message: 'OTP sent to +91' + phone,
+        data: { phone, otp, expiresIn: '10 minutes' },
+      });
+    }
 
-    // Create user with OTP (not verified yet)
-    const user = await User.create(userData);
+    const user = await User.create({ phone, otp, otpExpire, otpAttempts: 0, isPhoneVerified: false });
     console.log(`OTP for +91${phone}: ${otp}`);
 
     res.status(200).json({
@@ -78,6 +69,12 @@ exports.verifyOtp = async (req, res, next) => {
   try {
     const { phone, otp } = req.body;
 
+    //User Exists or not
+    const userExist = await User.findOne({ phone,isPhoneVerified:true });
+    if (userExist) {
+      return sendTokenResponse(userExist, 200, res,true);
+    }
+
     // Validate phone & OTP
     if (!phone || !otp) {
       return res.status(400).json({
@@ -85,6 +82,7 @@ exports.verifyOtp = async (req, res, next) => {
         message: 'Please provide phone number and OTP',
       });
     }
+
 
     // Find user with OTP and phone
     const user = await User.findOne({ phone }).select('+otp +otpExpire +otpAttempts');

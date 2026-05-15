@@ -10,6 +10,9 @@ const {
   editCustomerProfile,
   editWorkerProfile,
   editVendorProfile,
+  getStates,
+  getCitiesByState,
+  getLocationByIds,
 } = require('../controllers/profileController');
 
 const router = express.Router();
@@ -32,7 +35,12 @@ const vendorUpload = upload.fields([
 
 router.get('/me', protect, getProfile);
 
-// Create profile
+// States & Cities (public)
+router.get('/states', getStates);
+router.get('/cities/:stateId', getCitiesByState);
+router.post('/location/:stateId/:cityId', protect, getLocationByIds);
+
+// Create profile`
 router.post('/create/worker', protect, workerUpload, createWorkerProfile);
 router.post('/create/vendor', protect, vendorUpload, createVendorProfile);
 

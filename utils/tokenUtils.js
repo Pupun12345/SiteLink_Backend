@@ -6,7 +6,7 @@ const generateToken = (id) => {
   });
 };
 
-const sendTokenResponse = (user, statusCode, res) => {
+const sendTokenResponse = (user, statusCode, res,isExists=false) => {
   const token = generateToken(user._id);
 
   const userData = {
@@ -48,6 +48,7 @@ const sendTokenResponse = (user, statusCode, res) => {
   res.status(statusCode).json({
     success: true,
     token,
+    isExist: isExists,
     user: userData,
   });
 };
