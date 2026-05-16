@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const Skill = require('../models/Skill');
 
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
@@ -36,15 +37,15 @@ const STATES = [
 ];
 
 const CITIES = {
-  1:  ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati', 'Rajahmundry'],
-  2:  ['Itanagar', 'Naharlagun', 'Pasighat', 'Tawang', 'Ziro'],
-  3:  ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia'],
-  4:  ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga'],
-  5:  ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg', 'Rajnandgaon'],
-  6:  ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
-  7:  ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
-  8:  ['Faridabad', 'Gurugram', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar'],
-  9:  ['Shimla', 'Manali', 'Dharamshala', 'Solan', 'Mandi', 'Kullu'],
+  1: ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati', 'Rajahmundry'],
+  2: ['Itanagar', 'Naharlagun', 'Pasighat', 'Tawang', 'Ziro'],
+  3: ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia'],
+  4: ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga'],
+  5: ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg', 'Rajnandgaon'],
+  6: ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
+  7: ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
+  8: ['Faridabad', 'Gurugram', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar'],
+  9: ['Shimla', 'Manali', 'Dharamshala', 'Solan', 'Mandi', 'Kullu'],
   10: ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Deoghar', 'Hazaribagh'],
   11: ['Bengaluru', 'Mysuru', 'Hubli', 'Mangaluru', 'Belagavi', 'Kalaburagi', 'Davangere'],
   12: ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Palakkad', 'Alappuzha'],
@@ -103,6 +104,55 @@ exports.getLocationByIds = async (req, res) => {
   await User.findByIdAndUpdate(req.user.id, { workState: state.name, city: cityName });
 
   res.status(200).json({ success: true, data: { workState: state.name, preferredCity: cityName } });
+};
+
+//get Skills with number
+exports.getSkills = async (req, res) => {
+  try {
+    const skills = await Skill.find();
+    res.status(200).json({ success: true, data: skills });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+}
+
+// @route POST /api/profile/skills
+exports.updateWorkerSkills = async (req, res) => {
+  try {
+    const { primarySkillId, secondarySkillId, otherSkill } = req.query;
+    const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
+    const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
+    if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
+
+    user.primarySkill = primarySkillDoc.name;
+    user.role = primarySkillDoc.name;
+    user.skills = [];
+
+    if (secondary) {
+      const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
+      if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
+      user.skills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
+    }
+
+    if (other && other.trim()) {
+      user.skills.push({ skillId: 0, skillName: other.trim() });
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Skills updated successfully',
+      data: { primarySkill: user.primarySkill, skills: user.skills },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 };
 
 // Get Profile
