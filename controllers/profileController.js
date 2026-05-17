@@ -2,6 +2,8 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const Skill = require('../models/Skill');
+const { verify } = require('crypto');
+const Post = require('../models/Post');
 
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
@@ -163,19 +165,49 @@ exports.getProfile = async (req, res) => {
     if (!regularUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    
+    const Posts=await Post.find({ postedBy: regularUser._id }).sort({ createdAt: -1 });
+
+    const user = regularUser.userType === 'worker'
+      ? {
+          id: regularUser._id,
+          name: regularUser.name,
+          email: regularUser.email,
+          role: regularUser.role,
+          profileImage: regularUser.profileImage,
+          primarySkill: regularUser.primarySkill,
+          skills: regularUser.skills,
+          posts: Posts,
+          workCity: regularUser.city,
+          workState: regularUser.workState,
+          userType: regularUser.userType,
+          createdAt: regularUser.createdAt,
+          location: regularUser.location,
+        }
+      : {
+          id: regularUser._id,
+          name: regularUser.name,
+          email: regularUser.email,
+          role: regularUser.role,
+          profileImage: regularUser.profileImage,
+          userType: regularUser.userType,
+          createdAt: regularUser.createdAt,
+          city: regularUser.city,
+          State: regularUser.workState,
+          phone: regularUser.phone,
+          gstNumber: regularUser.gstNumber,
+          companyName: regularUser.companyName,
+          companyLogo: regularUser.companyLogo,
+          designation: regularUser.designation,
+          workArea: regularUser.workArea,
+          whatsappNumber: regularUser.whatsappNumber,
+          website: regularUser.website,
+        };
 
     return res.json({
       success: true,
-      user: {
-        id: regularUser._id,
-        name: regularUser.name,
-        email: regularUser.email,
-        role: regularUser.role,
-        profileImage: regularUser.profileImage,
-        userType: regularUser.userType,
-        createdAt: regularUser.createdAt
-      }
-    })
+      data: { user }
+    });
 
   } catch (error) {
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -222,7 +254,7 @@ exports.createWorkerProfile = async (req, res) => {
     //   }
     // }
 
-    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
+    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto,location } = req.body;
 
     if (!primarySkill) {
       return res.status(400).json({ success: false, message: 'Primary skill is required' });
@@ -250,6 +282,7 @@ exports.createWorkerProfile = async (req, res) => {
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
     if (workSamplesPhoto) user.workSamplesPhoto = typeof workSamplesPhoto === 'string' ? JSON.parse(workSamplesPhoto) : workSamplesPhoto;
+    if (location) user.location = location;
     user.role = primarySkill;
     user.userType = 'worker';
 
@@ -265,7 +298,7 @@ exports.createWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, prefferedCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary }
+      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, prefferedCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -280,7 +313,7 @@ exports.editWorkerProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto } = req.body;
+    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto,location } = req.body;
 
     if (!primarySkill) {
       return res.status(400).json({ success: false, message: 'Primary skill is required' });
@@ -308,6 +341,7 @@ exports.editWorkerProfile = async (req, res) => {
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
     if (workSamplesPhoto) user.workSamplesPhoto = typeof workSamplesPhoto === 'string' ? JSON.parse(workSamplesPhoto) : workSamplesPhoto;
+    if (location) user.location = location;
 
     if (req.files) {
       if (req.files.profileImage) {
@@ -323,7 +357,7 @@ exports.editWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile updated successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, prefferedCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary }
+      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, prefferedCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -370,7 +404,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website }
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -412,7 +446,7 @@ exports.editVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website }
+      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -18,10 +18,13 @@ const postSchema = new mongoose.Schema(
         message: 'Maximum 5 images allowed per post',
       },
     },
-    category: {
+    video: {
       type: String,
-      enum: ['work', 'project', 'skill', 'general', 'announcement', 'question', 'discussion', 'achievement', 'help'],
-      default: 'general',
+      default: null,
+    },
+    feeling: {
+      type: String,
+      default: null,
     },
     postedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -88,10 +91,6 @@ const postSchema = new mongoose.Schema(
       default: [],
     },
     commentsCount: {
-      type: Number,
-      default: 0,
-    },
-    shares: {
       type: Number,
       default: 0,
     },

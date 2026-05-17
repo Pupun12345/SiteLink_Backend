@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    default:null,
+    default: null,
   },
   userType: {
     type: String,
@@ -51,13 +51,13 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['Male', 'Female', 'Other'], default: null },
   primarySkill: { type: String, default: null },
   skills: {
-   type:[
-    {
-      skillId:{type:Number, required: true},
-      skillName:{type: String, required: true}
-    }
-   ],
-   default:[],
+    type: [
+      {
+        skillId: { type: Number, required: true },
+        skillName: { type: String, required: true }
+      }
+    ],
+    default: [],
   },
   experience: { type: String, default: null },
   experienceDescription: { type: String, default: null },
@@ -77,6 +77,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     min: [18, 'Age must be at least 18'],
     max: [100, 'Age must be less than 100'],
+    default: null,
+  },
+  location: {
+    type: String,
     default: null,
   },
   // Vendor/Contractor-specific fields
@@ -123,7 +127,7 @@ const userSchema = new mongoose.Schema({
       'Please provide a valid 10-digit WhatsApp number',
     ],
   },
-  
+
   // Common fields
   isPhoneVerified: {
     type: Boolean,

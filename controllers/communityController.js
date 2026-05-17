@@ -9,14 +9,9 @@ exports.getCommunityFeed = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const category = req.query.category || null;
     const posterType = req.query.posterType || null;
 
     let filter = { isActive: true, approvalStatus: 'approved' };
-
-    if (category) {
-      filter.category = category;
-    }
 
     if (posterType) {
       filter.posterType = posterType;
@@ -38,16 +33,15 @@ exports.getCommunityFeed = async (req, res) => {
       _id: post._id,
       content: post.content,
       images: post.images,
-      category: post.category,
+      video: post.video,
+      feeling: post.feeling,
       posterName: post.posterName,
       posterImage: post.posterImage,
       posterType: post.posterType,
       companyName: post.companyName,
       verification: post.verification,
-      location: post.location,
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
-      shares: post.shares,
       createdAt: post.createdAt,
       likes: post.likes.map(like => ({
         userId: like.userId?._id,
@@ -79,33 +73,33 @@ exports.getCommunityFeed = async (req, res) => {
 // @access  Private
 exports.createPost = async (req, res) => {
   try {
-    const { content, category, location } = req.body;
+    const { content, feeling } = req.body;
     const userId = req.user._id;
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Handle image uploads
-    const images = req.files && req.files.length > 0
-      ? req.files.map(file => `/uploads/posts/${file.filename}`)
+    const images = req.files?.images
+      ? req.files.images.map(file => `/uploads/posts/${file.filename}`)
       : [];
+
+    const video = req.files?.video?.[0]
+      ? `/uploads/posts/${req.files.video[0].filename}`
+      : null;
 
     const postData = {
       content,
-      category: category || 'general',
+      feeling: feeling || null,
       postedBy: userId,
       posterName: user.name,
       posterImage: user.profileImage,
       posterType: user.userType,
       companyName: user.companyName || user.ownerName || null,
       images,
-      location: location || user.city || null,
-      verification: user.verificationStatus === 'verified' ? 'verified' : 'unverified',
+      video,
+      verification: user.verificationStatus || 'unverified',
     };
 
     const post = await Post.create(postData);
@@ -121,28 +115,24 @@ exports.createPost = async (req, res) => {
         _id: populatedPost._id,
         content: populatedPost.content,
         images: populatedPost.images,
-        category: populatedPost.category,
+        video: populatedPost.video,
+        feeling: populatedPost.feeling,
         posterName: populatedPost.posterName,
         posterImage: populatedPost.posterImage,
         posterType: populatedPost.posterType,
         companyName: populatedPost.companyName,
         verification: populatedPost.verification,
-        location: populatedPost.location,
         likesCount: populatedPost.likesCount,
         commentsCount: populatedPost.commentsCount,
-        shares: populatedPost.shares,
         createdAt: populatedPost.createdAt,
         likes: populatedPost.likes,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error creating post',
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: 'Error creating post', error: error.message });
   }
 };
+
 
 // @desc    Like/Unlike a post
 // @route   PUT /api/community/posts/:postId/like
@@ -302,7 +292,7 @@ exports.addComment = async (req, res) => {
       userType: newComment.userId.userType,
       isVerified: newComment.userId.verificationStatus === 'verified',
       likesCount: newComment.likesCount,
-      repliesCount: newComment.repliesCount,
+
       isEdited: newComment.isEdited,
       createdAt: newComment.createdAt,
       updatedAt: newComment.updatedAt
@@ -381,7 +371,7 @@ exports.updateComment = async (req, res) => {
       userType: existingComment.userId.userType,
       isVerified: existingComment.userId.verificationStatus === 'verified',
       likesCount: existingComment.likesCount,
-      repliesCount: existingComment.repliesCount,
+
       isEdited: existingComment.isEdited,
       editedAt: existingComment.editedAt,
       createdAt: existingComment.createdAt,
@@ -514,7 +504,7 @@ exports.getCommentsByPost = async (req, res) => {
       userType: comment.userId.userType,
       isVerified: comment.userId.verificationStatus === 'verified',
       likesCount: comment.likesCount,
-      repliesCount: comment.repliesCount,
+
       isEdited: comment.isEdited,
       editedAt: comment.editedAt,
       createdAt: comment.createdAt,

@@ -44,10 +44,6 @@ const commentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    repliesCount: {
-      type: Number,
-      default: 0,
-    },
     status: {
       type: String,
       enum: ['active', 'deleted', 'hidden'],
@@ -72,24 +68,22 @@ commentSchema.virtual('replies', {
   options: { sort: { createdAt: 1 } }
 });
 
-commentSchema.pre('save', async function(next) {
+commentSchema.pre('save', async function() {
   if (this.isNew && this.parentComment) {
     await mongoose.model('Comment').findByIdAndUpdate(
       this.parentComment,
       { $inc: { repliesCount: 1 } }
     );
   }
-  next();
 });
 
-commentSchema.pre('remove', async function(next) {
+commentSchema.pre('remove', async function() {
   if (this.parentComment) {
     await mongoose.model('Comment').findByIdAndUpdate(
       this.parentComment,
       { $inc: { repliesCount: -1 } }
     );
   }
-  next();
 });
 
 module.exports = mongoose.model('Comment', commentSchema);

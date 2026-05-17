@@ -21,7 +21,7 @@ const upload = require('../middleware/upload');
 router.get('/feed', protect, getCommunityFeed);
 
 // POST create post
-router.post('/posts', protect, upload.array('images', 5), createPost);
+router.post('/posts', protect, upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }]), createPost);
 
 // PUT like/unlike post
 router.put('/posts/:postId/like', protect, likeUnlikePost);
