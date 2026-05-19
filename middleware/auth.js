@@ -86,4 +86,5 @@ exports.applicable = async (req, res, next) => {
       message: 'Not allow to apply to job',
     });
   }
+  next();
 }

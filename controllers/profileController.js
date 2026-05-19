@@ -91,21 +91,17 @@ exports.getCitiesByState = (req, res) => {
   res.status(200).json({ success: true, state: state.name, data: cities });
 };
 
-// @desc  Save workState and preferredCity to user by stateId and cityId
-// @route POST `/api/profile/location/:stateId/:cityId`
-exports.getLocationByIds = async (req, res) => {
-  const stateId = parseInt(req.params.stateId);
-  const cityId = parseInt(req.params.cityId);
+function getLocationByIds(workStateID, workCityID) {
+  const stateId = parseInt(workStateID);
+  const cityId = parseInt(workCityID);
 
   const state = STATES.find(s => s.id === stateId);
-  if (!state) return res.status(404).json({ success: false, message: 'State not found' });
+  if (!state) return { workState: null, workCity: null };
 
   const cityName = (CITIES[stateId] || [])[cityId - 1];
-  if (!cityName) return res.status(404).json({ success: false, message: 'City not found' });
+  if (!cityName) return { workState: state.name, workCity: null };
 
-  await User.findByIdAndUpdate(req.user.id, { workState: state.name, city: cityName });
-
-  res.status(200).json({ success: true, data: { workState: state.name, preferredCity: cityName } });
+  return { workState: state.name, workCity: cityName };
 };
 
 //get Skills with number
@@ -118,45 +114,6 @@ exports.getSkills = async (req, res) => {
   }
 }
 
-// @route POST /api/profile/skills
-exports.updateWorkerSkills = async (req, res) => {
-  try {
-    const { primarySkillId, secondarySkillId, otherSkill } = req.query;
-    const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
-    const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-    const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
-    if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
-
-    user.primarySkill = primarySkillDoc.name;
-    user.role = primarySkillDoc.name;
-    user.skills = [];
-
-    if (secondary) {
-      const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
-      if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
-      user.skills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
-    }
-
-    if (other && other.trim()) {
-      user.skills.push({ skillId: 0, skillName: other.trim() });
-    }
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Skills updated successfully',
-      data: { primarySkill: user.primarySkill, skills: user.skills },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-};
-
 // Get Profile
 exports.getProfile = async (req, res) => {
   try {
@@ -165,44 +122,44 @@ exports.getProfile = async (req, res) => {
     if (!regularUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
-    const Posts=await Post.find({ postedBy: regularUser._id }).sort({ createdAt: -1 });
+
+    const Posts = await Post.find({ postedBy: regularUser._id }).sort({ createdAt: -1 });
 
     const user = regularUser.userType === 'worker'
       ? {
-          id: regularUser._id,
-          name: regularUser.name,
-          email: regularUser.email,
-          role: regularUser.role,
-          profileImage: regularUser.profileImage,
-          primarySkill: regularUser.primarySkill,
-          skills: regularUser.skills,
-          posts: Posts,
-          workCity: regularUser.city,
-          workState: regularUser.workState,
-          userType: regularUser.userType,
-          createdAt: regularUser.createdAt,
-          location: regularUser.location,
-        }
+        id: regularUser._id,
+        name: regularUser.name,
+        email: regularUser.email,
+        role: regularUser.role,
+        profileImage: regularUser.profileImage,
+        primarySkill: regularUser.primarySkill,
+        skills: regularUser.skills,
+        posts: Posts,
+        workCity: regularUser.city,
+        workState: regularUser.workState,
+        userType: regularUser.userType,
+        createdAt: regularUser.createdAt,
+        location: regularUser.location,
+      }
       : {
-          id: regularUser._id,
-          name: regularUser.name,
-          email: regularUser.email,
-          role: regularUser.role,
-          profileImage: regularUser.profileImage,
-          userType: regularUser.userType,
-          createdAt: regularUser.createdAt,
-          city: regularUser.city,
-          State: regularUser.workState,
-          phone: regularUser.phone,
-          gstNumber: regularUser.gstNumber,
-          companyName: regularUser.companyName,
-          companyLogo: regularUser.companyLogo,
-          designation: regularUser.designation,
-          workArea: regularUser.workArea,
-          whatsappNumber: regularUser.whatsappNumber,
-          website: regularUser.website,
-        };
+        id: regularUser._id,
+        name: regularUser.name,
+        email: regularUser.email,
+        role: regularUser.role,
+        profileImage: regularUser.profileImage,
+        userType: regularUser.userType,
+        createdAt: regularUser.createdAt,
+        city: regularUser.city,
+        State: regularUser.workState,
+        phone: regularUser.phone,
+        gstNumber: regularUser.gstNumber,
+        companyName: regularUser.companyName,
+        companyLogo: regularUser.companyLogo,
+        designation: regularUser.designation,
+        workArea: regularUser.workArea,
+        whatsappNumber: regularUser.whatsappNumber,
+        website: regularUser.website,
+      };
 
     return res.json({
       success: true,
@@ -220,70 +177,77 @@ exports.createWorkerProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Allow creation if userType is not set yet; block only if it's set to a different type
     if (user.userType && user.userType !== 'worker') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // const mandatoryDocuments = await PlatformSettings.getOrCreateSettings().then(settings => settings.verificationRules.worker);
+    const { primarySkillId, secondarySkillId, otherSkill } = req.body;
 
-    // const fieldMap = {
-    //   idProof: () => req.files?.aadhaarFrontImage?.[0] && req.files?.aadhaarBackImage?.[0],
-    //   age: () => req.body?.age && parseInt(req.body.age) > 0,
-    //   medicalCertificate: () => req.files?.medicalCertificate?.[0]
-    // };
+    const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
 
-    // const rule = Object.entries(mandatoryDocuments);
+    if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
 
-    // for (const [key, value] of rule) {
-    //   if (value) {
-    //     const validator = fieldMap[key];
-    //     if (!validator) {
-    //       console.warn(`No validator found for mandatory field: ${key}`);
-    //       continue;
-    //     }
-    //     if (!validator()) {
-    //       return res.status(400).json({
-    //         success: false,
-    //         message: `Missing or invalid mandatory document: ${key}`
-    //       });
-    //     }
-    //   }
-    // }
+    const newSkills = [];
 
-    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto,location } = req.body;
+    const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
 
-    if (!primarySkill) {
-      return res.status(400).json({ success: false, message: 'Primary skill is required' });
+    const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
+
+    if (secondary) {
+      const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
+
+      if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
+
+      newSkills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
     }
+
+    if (otherSkill && otherSkill.trim()) {
+      newSkills.push({ skillId: 0, skillName: otherSkill.trim() });
+    }
+
+    user.skills = newSkills;
+    await user.save();
+
+    const { workStateID, workCityID } = req.body;
+
+    const { workState, workCity } = getLocationByIds(parseInt(workStateID), parseInt(workCityID));
+
+    if ((workStateID && !workState) || (workCityID && !workCity)) {
+      return res.status(404).json({ success: false, message: 'Invalid work state or city' });
+    }
+
+    if (workState && workCity) {
+      user.workState = workState;
+      user.city = workCity;
+    }
+
+    const { name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location } = req.body;
 
     if (dateOfBirth) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(dateOfBirth)) {
-        return res.status(400).json({ success: false, message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)" });
+        return res.status(400).json({ success: false, message: 'Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)' });
       }
-      const parsedDate = new Date(dateOfBirth);
-      if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({ success: false, message: "Invalid date of birth" });
+      if (isNaN(new Date(dateOfBirth).getTime())) {
+        return res.status(400).json({ success: false, message: 'Invalid date of birth' });
       }
     }
 
     if (name) user.name = name;
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (gender) user.gender = gender;
-    if (primarySkill) user.primarySkill = primarySkill;
-    if (additionalSkills) user.skills = typeof additionalSkills === 'string' ? JSON.parse(additionalSkills) : additionalSkills;
     if (totalExperience) user.experience = totalExperience;
     if (experienceDescription) user.experienceDescription = experienceDescription;
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
-    if (workSamplesPhoto) user.workSamplesPhoto = typeof workSamplesPhoto === 'string' ? JSON.parse(workSamplesPhoto) : workSamplesPhoto;
     if (location) user.location = location;
-    user.role = primarySkill;
+
+    user.primarySkill = primarySkillDoc.name;
+    user.role = primarySkillDoc.name;
     user.userType = 'worker';
 
     if (req.files) {
@@ -312,52 +276,68 @@ exports.editWorkerProfile = async (req, res) => {
     if (!user || user.userType !== 'worker') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+    
+    const { primarySkillId, secondarySkillId, otherSkill, name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, workStateID, workCityID } = req.body;
 
-    const { name, dateOfBirth, gender, primarySkill, additionalSkills, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, workSamplesPhoto,location } = req.body;
+    if (primarySkillId) {
+      const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
+      if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
 
-    if (!primarySkill) {
-      return res.status(400).json({ success: false, message: 'Primary skill is required' });
+      const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
+      const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
+      const newSkills = [];
+
+      if (secondary) {
+        const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
+        if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
+        newSkills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
+      }
+      if (otherSkill && otherSkill.trim()) newSkills.push({ skillId: 0, skillName: otherSkill.trim() });
+
+      user.skills = newSkills;
+      user.markModified('skills');
+      user.primarySkill = primarySkillDoc.name;
+      user.role = primarySkillDoc.name;
     }
 
-    if (dateOfBirth) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(dateOfBirth)) {
-        return res.status(400).json({ success: false, message: "Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)" });
-      }
-      const parsedDate = new Date(dateOfBirth);
-      if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({ success: false, message: "Invalid date of birth" });
-      }
+    if (workStateID && workCityID) {
+      const { workState, workCity } = getLocationByIds(workStateID, workCityID);
+      if (workState) user.workState = workState;
+      if (workCity) user.city = workCity;
     }
 
     if (name) user.name = name;
-    if (dateOfBirth) user.dateOfBirth = dateOfBirth;
+    if (dateOfBirth) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateOfBirth)) return res.status(400).json({ success: false, message: 'Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)' });
+      if (isNaN(new Date(dateOfBirth).getTime())) return res.status(400).json({ success: false, message: 'Invalid date of birth' });
+      user.dateOfBirth = dateOfBirth;
+    }
     if (gender) user.gender = gender;
-    if (primarySkill) { user.primarySkill = primarySkill; user.role = primarySkill; }
-    if (additionalSkills) user.skills = typeof additionalSkills === 'string' ? JSON.parse(additionalSkills) : additionalSkills;
     if (totalExperience) user.experience = totalExperience;
     if (experienceDescription) user.experienceDescription = experienceDescription;
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType;
     if (salary) user.salary = salary;
-    if (workSamplesPhoto) user.workSamplesPhoto = typeof workSamplesPhoto === 'string' ? JSON.parse(workSamplesPhoto) : workSamplesPhoto;
     if (location) user.location = location;
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => { });
+        if (user.profileImage) fs.unlink(user.profileImage, () => {});
         user.profileImage = req.files.profileImage[0].path;
       }
-      if (req.files.workSamplesPhoto) {
-        user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
-      }
+      if (req.files.workSamplesPhoto) user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
+      if (req.files.experienceCertificate) user.experienceCertificate = req.files.experienceCertificate[0].path;
+      if (req.files.governmentID) user.governmentID = req.files.governmentID[0].path;
     }
+
     await user.save();
+    const savedUser = await User.findById(user._id);
 
     res.json({
       success: true,
       message: 'Worker profile updated successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, prefferedCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, prefferedCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -369,19 +349,22 @@ exports.editWorkerProfile = async (req, res) => {
 exports.createVendorProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    // Allow creation if userType is not set yet; block only if it's set to a different type
-    if (user.userType && user.userType !== 'vendor') {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website } = req.body;
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    if (user.userType && user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
 
     if (!companyName) return res.status(400).json({ success: false, message: 'Company name is required' });
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
     if (!designation) return res.status(400).json({ success: false, message: 'Designation is required' });
+
+    if (workStateID && workCityID) {
+      const { workState, workCity } = getLocationByIds(workStateID, workCityID);
+      if (workState) user.workState = workState;
+      if (workCity) user.city = workCity;
+    }
 
     if (companyName) user.companyName = companyName;
     if (name) user.name = name;
@@ -400,11 +383,12 @@ exports.createVendorProfile = async (req, res) => {
     }
 
     await user.save();
+    const savedUser = await User.findById(user._id);
 
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.designation, city: savedUser.city, state: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -415,11 +399,16 @@ exports.createVendorProfile = async (req, res) => {
 exports.editVendorProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user || user.userType !== 'vendor') {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website } = req.body;
+    if (!user || user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
+
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
+
+    if (workStateID && workCityID) {
+      const { workState, workCity } = getLocationByIds(workStateID, workCityID);
+      if (workState) user.workState = workState;
+      if (workCity) user.city = workCity;
+    }
 
     if (companyName) user.companyName = companyName;
     if (name) user.name = name;
@@ -432,21 +421,22 @@ exports.editVendorProfile = async (req, res) => {
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => { });
+        if (user.profileImage) fs.unlink(user.profileImage, () => {});
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.companyLogo) {
-        if (user.companyLogo) fs.unlink(user.companyLogo, () => { });
+        if (user.companyLogo) fs.unlink(user.companyLogo, () => {});
         user.companyLogo = req.files.companyLogo[0].path;
       }
     }
 
     await user.save();
+    const savedUser=await User.findById(req.user.id);
 
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, email: user.email, userType: user.userType, role: user.role, profileImage: user.profileImage, companyName: user.companyName, companyLogo: user.companyLogo, designation: user.designation, city: user.city, workArea: user.workArea, gstNumber: user.gstNumber, whatsappNumber: user.whatsappNumber, website: user.website, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.designation, city: savedUser.city, state: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

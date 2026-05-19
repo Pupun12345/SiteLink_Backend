@@ -12,9 +12,7 @@ const {
   editVendorProfile,
   getStates,
   getCitiesByState,
-  getLocationByIds,
   getSkills,
-  updateWorkerSkills,
 } = require('../controllers/profileController');
 
 const router = express.Router();
@@ -40,12 +38,11 @@ router.get('/me', protect, getProfile);
 // States & Cities (public)
 router.get('/states', getStates);
 router.get('/cities/:stateId', getCitiesByState);
-router.post('/location/:stateId/:cityId', protect, getLocationByIds);
+// router.post('/location/:stateId/:cityId', protect, getLocationByIds);
 
 router.get('/skills', protect, getSkills);
-router.post('/skills', protect, updateWorkerSkills);
 
-// Create profile`
+// Create profile
 router.post('/create/worker', protect, workerUpload, createWorkerProfile);
 router.post('/create/vendor', protect, vendorUpload, createVendorProfile);
 
