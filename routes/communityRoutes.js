@@ -16,12 +16,13 @@ const {
 } = require('../controllers/communityController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { handleUpload } = require('../middleware/upload');
 
 // GET community feed
 router.get('/feed', protect, getCommunityFeed);
 
 // POST create post
-router.post('/posts', protect, upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }]), createPost);
+router.post('/posts', protect, handleUpload(upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }])), createPost);
 
 // PUT like/unlike post
 router.put('/posts/:postId/like', protect, likeUnlikePost);

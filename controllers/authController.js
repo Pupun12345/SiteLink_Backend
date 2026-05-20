@@ -4,6 +4,7 @@ const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
 const crypto = require('crypto');
+const admin = require('../config/firebase');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -141,6 +142,69 @@ exports.verifyOtp = async (req, res, next) => {
   }
 };
 
+
+// @desc    Google Firebase Authentication
+// @route   POST /api/auth/google-login
+// @access  Public
+exports.googleAuthLogin = async (req, res) => {
+  try {
+    const { firebaseIdToken, deviceToken, deviceType } = req.body;
+
+    if (!firebaseIdToken) {
+      return res.status(400).json({ success: false, message: 'Firebase ID token is required' });
+    }
+
+    // Verify Firebase token
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid or expired Firebase token' });
+    }
+
+    const { uid, email, name, picture, firebase: { sign_in_provider } } = decodedToken;
+
+    // Only allow Google sign-in via this endpoint
+    if (sign_in_provider !== 'google.com') {
+      return res.status(400).json({ success: false, message: 'Only Google sign-in is supported on this endpoint' });
+    }
+
+    // Find or create user
+    let user = await User.findOne({ firebaseUid: uid });
+    const isExist = !!user;
+
+    if (!user) {
+      // Check if email already registered via phone auth
+      if (email) user = await User.findOne({ email });
+
+      if (user) {
+        // Link Google to existing account
+        user.firebaseUid = uid;
+        user.authProvider = 'google';
+      } else {
+        // Create new user
+        user = new User({
+          firebaseUid: uid,
+          email,
+          name: name || null,
+          profileImage: picture || null,
+          authProvider: 'google',
+          isPhoneVerified: true, // Assume Google accounts are verified(as we dont require any otp verification for google auth)
+        });
+      }
+    }
+
+    // Update device info on every login
+    if (deviceToken) user.deviceToken = deviceToken;
+    if (deviceType) user.deviceType = deviceType;
+    await user.save();
+
+    sendTokenResponse(user, 200, res, isExist);
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({ success: false, message: 'Server error during Google authentication' });
+  }
+};
 
 // @desc    Get current logged in user
 // @route   GET /api/auth/me

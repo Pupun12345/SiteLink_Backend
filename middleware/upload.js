@@ -20,11 +20,9 @@ if (!fs.existsSync(postsDir)) {
 // Configure storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Use different folders based on field name
+    // Different folders based on field name
     if (file.fieldname === 'profileImage' || file.fieldname === 'companyLogo') {
       cb(null, profileDir);
-    } else if (file.fieldname === 'aadhaarFrontImage' || file.fieldname === 'aadhaarBackImage'|| file.fieldname === 'panCardImage') {
-      cb(null, documentsDir);
     } else if (file.fieldname === 'images' || file.fieldname === 'video') {
       cb(null, postsDir);
     } else {
@@ -32,10 +30,10 @@ const storage = multer.diskStorage({
     }
   },
   filename: function (req, file, cb) {
-    // Create unique filename based on field type
+    // Unique filename based on field type
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     let prefix = 'file';
-    
+
     if (file.fieldname === 'profileImage') {
       prefix = 'profile';
     } else if (file.fieldname === 'companyLogo') {
@@ -45,13 +43,13 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === 'aadhaarBackImage') {
       prefix = 'aadhaar-back';
     }
-    else if (file.fieldname === 'panCardImage'){
+    else if (file.fieldname === 'panCardImage') {
       prefix = 'pan-card';
     }
-    else if (file.fieldname === 'images' || file.fieldname === 'video'){
+    else if (file.fieldname === 'images' || file.fieldname === 'video') {
       prefix = 'post';
     }
-    
+
     cb(null, prefix + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
@@ -59,20 +57,14 @@ const storage = multer.diskStorage({
 // File filter - accept images and videos
 const fileFilter = (req, file, cb) => {
   if (file.fieldname === 'video') {
-    const allowedVideo = /mp4|mov|avi|mkv|webm/;
-    const extname = allowedVideo.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = /video/.test(file.mimetype);
-    if (mimetype && extname) return cb(null, true);
-    return cb(new Error('Only video files are allowed (mp4, mov, avi, mkv, webm)'));
+    if (/video/.test(file.mimetype)) return cb(null, true);
+    return cb(new Error('Only video files are allowed'));
   }
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-  if (mimetype && extname) return cb(null, true);
-  cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+  if (/jpeg|jpg|png|gif|webp/.test(file.mimetype)) return cb(null, true);
+  cb(new Error('Only image files are allowed'));
 };
 
-// Create multer upload instance
+// Multer upload instance
 const upload = multer({
   storage: storage,
   limits: {
@@ -80,5 +72,14 @@ const upload = multer({
   },
   fileFilter: fileFilter,
 });
-
 module.exports = upload;
+
+// Middleware wrapper that returns 400 on multer/file validation errors
+module.exports.handleUpload = (uploadMiddleware) => (req, res, next) => {
+  uploadMiddleware(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+};

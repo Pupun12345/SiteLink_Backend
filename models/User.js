@@ -9,13 +9,14 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Please provide a phone number'],
     unique: true,
+    sparse: true,
     trim: true,
     match: [
       /^[6-9]\d{9}$/,
       'Please provide a valid 10-digit phone number',
     ],
+    default: null,
   },
   email: {
     type: String,
@@ -127,6 +128,21 @@ const userSchema = new mongoose.Schema({
       'Please provide a valid 10-digit WhatsApp number',
     ],
   },
+
+  // Google / Social Auth
+  firebaseUid: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: null,
+  },
+  authProvider: {
+    type: String,
+    enum: ['phone', 'google', 'apple'],
+    default: 'phone',
+  },
+  deviceToken: { type: String, default: null },
+  deviceType: { type: String, enum: ['android', 'ios', 'web'], default: null },
 
   // Common fields
   isPhoneVerified: {

@@ -5,6 +5,7 @@ const {
   verifyOtp,
   logout,
   getMe,
+  googleAuthLogin,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -21,6 +22,7 @@ const otpValidation = body('otp')
 // Public routes
 router.post('/register', [phoneValidation], register);
 router.post('/verify-otp', [phoneValidation, otpValidation], verifyOtp);
+router.post('/google-login', googleAuthLogin);
 
 // Private routes
 router.get('/me', protect, getMe);

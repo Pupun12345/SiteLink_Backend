@@ -1,5 +1,6 @@
 const express = require('express');
 const upload = require('../middleware/upload');
+const { handleUpload } = require('../middleware/upload');
 const { protect } = require('../middleware/auth');
 const {
   getProfile,
@@ -43,11 +44,11 @@ router.get('/cities/:stateId', getCitiesByState);
 router.get('/skills', protect, getSkills);
 
 // Create profile
-router.post('/create/worker', protect, workerUpload, createWorkerProfile);
-router.post('/create/vendor', protect, vendorUpload, createVendorProfile);
+router.post('/create/worker', protect, handleUpload(workerUpload), createWorkerProfile);
+router.post('/create/vendor', protect, handleUpload(vendorUpload), createVendorProfile);
 
 // Edit profile
-router.put('/edit/worker', protect, workerUpload, editWorkerProfile);
-router.put('/edit/vendor', protect, vendorUpload, editVendorProfile);
+router.put('/edit/worker', protect, handleUpload(workerUpload), editWorkerProfile);
+router.put('/edit/vendor', protect, handleUpload(vendorUpload), editVendorProfile);
 
 module.exports = router;
