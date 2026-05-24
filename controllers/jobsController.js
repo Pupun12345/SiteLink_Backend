@@ -1,6 +1,6 @@
 const Job = require('../models/job');
 const User = require('../models/User');
-const Application= require('../models/Application');
+const Application = require('../models/Application');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
@@ -136,7 +136,7 @@ exports.applyToJob = async (req, res) => {
 // @desc    Get Job Details by ID
 // @route   POST /api/jobs/:id/getJobDetails
 // @access  Private
-exports.getJobDetailsById=async(req,res)=>{
+exports.getJobDetailsById = async (req, res) => {
   try {
     const { id } = req.params;
     const job = await Job.findById(id)
@@ -156,7 +156,7 @@ exports.getJobDetailsById=async(req,res)=>{
     });
   } catch (error) {
     res.status(500).json({
-      success: false, 
+      success: false,
       message: 'Server Error',
     });
   }
@@ -165,13 +165,13 @@ exports.getJobDetailsById=async(req,res)=>{
 // @desc    Get Applied Job Details by ID
 // @route   POST /api/jobs/:id/getAppliedJobs
 // @access  Private
-exports.appliedJobs=async(req,res)=>{
+exports.appliedJobs = async (req, res) => {
   try {
-    const {id:applicantID}=req.params;
+    const { id: applicantID } = req.params;
 
-    const data=await Application.find({applicant:applicantID})
-    .populate('job', 'title company location salary salaryType isUrgent duration description experience')
-    .lean();
+    const data = await Application.find({ applicant: applicantID })
+      .populate('job', 'title company location salary salaryType isUrgent duration description experience')
+      .lean();
 
     res.status(200).json({
       success: true,

@@ -54,14 +54,9 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter - accept images and videos
+// File filter - accept any file type (removed image-only restriction)
 const fileFilter = (req, file, cb) => {
-  if (file.fieldname === 'video') {
-    if (/video/.test(file.mimetype)) return cb(null, true);
-    return cb(new Error('Only video files are allowed'));
-  }
-  if (/jpeg|jpg|png|gif|webp/.test(file.mimetype)) return cb(null, true);
-  cb(new Error('Only image files are allowed'));
+  cb(null, true);
 };
 
 // Multer upload instance
