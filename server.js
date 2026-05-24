@@ -50,6 +50,11 @@ app.use('/api/jobs', jobRoutes);
 // app.use('/api/notifications', notificationRoutes);
 // app.use('/api/platform-settings', platformSettingRoutes);
 
+// Test auth page
+app.get('/test-auth', (req, res) => {
+  res.sendFile(__dirname + '/server.html');
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({
@@ -69,6 +74,11 @@ app.use((req, res) => {
 
 // Error handler
 app.use(errorHandler);
+
+app.get('/test-auth', (req, res) => {
+  res.sendFile(__dirname + '/server.html');
+});
+
 
 // Start server
 const PORT = process.env.PORT || 5000;

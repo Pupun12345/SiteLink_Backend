@@ -81,6 +81,7 @@ exports.getStates = (req, res) => {
 // @route GET /api/profile/cities/:stateId
 exports.getCitiesByState = (req, res) => {
   const stateId = parseInt(req.params.stateId);
+  if (isNaN(stateId)) return res.status(400).json({ success: false, message: 'Invalid state ID' });
   const state = STATES.find(s => s.id === stateId);
 
   if (!state) {
@@ -186,7 +187,12 @@ exports.createWorkerProfile = async (req, res) => {
 
     const { primarySkillId, secondarySkillId, otherSkill } = req.body;
 
-    const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
+    if (!primarySkillId) return res.status(400).json({ success: false, message: 'Primary skill is required' });
+
+    const parsedPrimarySkillId = parseInt(primarySkillId);
+    if (isNaN(parsedPrimarySkillId)) return res.status(400).json({ success: false, message: 'Invalid primary skill ID' });
+
+    const primarySkillDoc = await Skill.findOne({ id: parsedPrimarySkillId });
 
     if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
 
@@ -197,7 +203,9 @@ exports.createWorkerProfile = async (req, res) => {
     const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
 
     if (secondary) {
-      const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
+      const parsedSecondaryId = parseInt(secondary);
+      if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
+      const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });
 
       if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
 
@@ -213,7 +221,7 @@ exports.createWorkerProfile = async (req, res) => {
 
     const { workStateID, workCityID } = req.body;
 
-    const { workState, workCity } = getLocationByIds(parseInt(workStateID), parseInt(workCityID));
+    const { workState, workCity } = getLocationByIds(workStateID, workCityID);
 
     if ((workStateID && !workState) || (workCityID && !workCity)) {
       return res.status(404).json({ success: false, message: 'Invalid work state or city' });
@@ -280,7 +288,9 @@ exports.editWorkerProfile = async (req, res) => {
     const { primarySkillId, secondarySkillId, otherSkill, name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, workStateID, workCityID } = req.body;
 
     if (primarySkillId) {
-      const primarySkillDoc = await Skill.findOne({ id: parseInt(primarySkillId) });
+      const parsedPrimaryId = parseInt(primarySkillId);
+      if (isNaN(parsedPrimaryId)) return res.status(400).json({ success: false, message: 'Invalid primary skill ID' });
+      const primarySkillDoc = await Skill.findOne({ id: parsedPrimaryId });
       if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
 
       const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
@@ -288,7 +298,9 @@ exports.editWorkerProfile = async (req, res) => {
       const newSkills = [];
 
       if (secondary) {
-        const secondarySkillDoc = await Skill.findOne({ id: parseInt(secondary) });
+        const parsedSecondaryId = parseInt(secondary);
+        if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
+        const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });
         if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
         newSkills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
       }

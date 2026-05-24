@@ -148,18 +148,35 @@ exports.verifyOtp = async (req, res, next) => {
 // @access  Public
 exports.googleAuthLogin = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ success: false, message: 'Request body is missing. Send JSON with Content-Type: application/json' });
+    }
     const { firebaseIdToken, deviceToken, deviceType } = req.body;
+    console.log('Received token length:', firebaseIdToken?.length);
+    console.log('Token preview:', firebaseIdToken?.substring(0, 50));
 
     if (!firebaseIdToken) {
       return res.status(400).json({ success: false, message: 'Firebase ID token is required' });
+    }
+
+    // Decode header without verifying to check algorithm
+    try {
+      const headerB64 = firebaseIdToken.split('.')[0];
+      const header = JSON.parse(Buffer.from(headerB64, 'base64').toString());
+      if (header.alg !== 'RS256') {
+        return res.status(400).json({ success: false, message: `Invalid token: expected Firebase ID token (RS256) but got ${header.alg}. Do not send your app JWT here.` });
+      }
+    } catch {
+      return res.status(400).json({ success: false, message: 'Malformed token' });
     }
 
     // Verify Firebase token
     let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
-    } catch {
-      return res.status(401).json({ success: false, message: 'Invalid or expired Firebase token' });
+    } catch (e) {
+      console.error('Firebase token verification failed:', e.code, e.message);
+      return res.status(401).json({ success: false, message: `Invalid or expired Firebase token: ${e.code}` });
     }
 
     const { uid, email, name, picture, firebase: { sign_in_provider } } = decodedToken;
