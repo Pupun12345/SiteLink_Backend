@@ -198,17 +198,18 @@ exports.createWorkerProfile = async (req, res) => {
 
     const newSkills = [];
 
-    const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
+    let parsedSecondarySkillId = secondarySkillId;
+    if (typeof secondarySkillId === 'string' && secondarySkillId.startsWith('[')) {
+      try { parsedSecondarySkillId = JSON.parse(secondarySkillId); } catch { parsedSecondarySkillId = [secondarySkillId]; }
+    }
+    const secondaryIds = Array.isArray(parsedSecondarySkillId) ? parsedSecondarySkillId : (parsedSecondarySkillId != null ? [parsedSecondarySkillId] : []);
+    const filteredSecondaryIds = secondaryIds.filter(id => id != null && id !== '' && id !== '0' && id !== 'none' && id !== 0);
 
-    const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
-
-    if (secondary) {
+    for (const secondary of filteredSecondaryIds) {
       const parsedSecondaryId = parseInt(secondary);
       if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
       const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });
-
       if (!secondarySkillDoc) return res.status(404).json({ success: false, message: 'Secondary skill not found' });
-
       newSkills.push({ skillId: secondarySkillDoc.id, skillName: secondarySkillDoc.name });
     }
 
@@ -293,11 +294,15 @@ exports.editWorkerProfile = async (req, res) => {
       const primarySkillDoc = await Skill.findOne({ id: parsedPrimaryId });
       if (!primarySkillDoc) return res.status(404).json({ success: false, message: 'Primary skill not found' });
 
-      const secondary = secondarySkillId && secondarySkillId !== '0' && secondarySkillId !== 'none' ? secondarySkillId : null;
-      const other = otherSkill && otherSkill !== '0' && otherSkill !== 'none' ? otherSkill : null;
+      let parsedSecondarySkillId = secondarySkillId;
+      if (typeof secondarySkillId === 'string' && secondarySkillId.startsWith('[')) {
+        try { parsedSecondarySkillId = JSON.parse(secondarySkillId); } catch { parsedSecondarySkillId = [secondarySkillId]; }
+      }
+      const secondaryIds = Array.isArray(parsedSecondarySkillId) ? parsedSecondarySkillId : (parsedSecondarySkillId != null ? [parsedSecondarySkillId] : []);
+      const filteredSecondaryIds = secondaryIds.filter(id => id != null && id !== '' && id !== '0' && id !== 'none' && id !== 0);
       const newSkills = [];
 
-      if (secondary) {
+      for (const secondary of filteredSecondaryIds) {
         const parsedSecondaryId = parseInt(secondary);
         if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
         const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });

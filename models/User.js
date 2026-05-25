@@ -143,6 +143,7 @@ const userSchema = new mongoose.Schema({
   },
   deviceToken: { type: String, default: null },
   deviceType: { type: String, enum: ['android', 'ios', 'web'], default: null },
+  fcmToken: { type: String, default: null },
 
   // Common fields
   isPhoneVerified: {
