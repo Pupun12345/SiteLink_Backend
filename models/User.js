@@ -69,7 +69,7 @@ const userSchema = new mongoose.Schema({
     default: null,
   },
   willingtoRelocate: { type: Boolean, default: false },
-  salaryType: { type: String, enum: ['Daily', 'Monthly', 'Hourly', 'Project-based'], default: null },
+  salaryType: { type: String, enum: ['daily', 'monthly', 'hourly', 'project-based'], default: null },
   salary: { type: Number, default: null },
   governmentID: { type: String, default: null },
   experienceCertificate: { type: String, default: null },

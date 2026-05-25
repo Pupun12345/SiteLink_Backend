@@ -105,7 +105,7 @@ function getLocationByIds(workStateID, workCityID) {
   return { workState: state.name, workCity: cityName };
 };
 
-//get Skills with number
+//Get Skills with number
 exports.getSkills = async (req, res) => {
   try {
     const skills = await Skill.find();
