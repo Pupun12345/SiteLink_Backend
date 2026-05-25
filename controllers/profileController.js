@@ -150,8 +150,8 @@ exports.getProfile = async (req, res) => {
         profileImage: regularUser.profileImage,
         userType: regularUser.userType,
         createdAt: regularUser.createdAt,
-        city: regularUser.city,
-        State: regularUser.workState,
+        workCity: regularUser.city,
+        workState: regularUser.workState,
         phone: regularUser.phone,
         gstNumber: regularUser.gstNumber,
         companyName: regularUser.companyName,
@@ -205,7 +205,12 @@ exports.createWorkerProfile = async (req, res) => {
     const secondaryIds = Array.isArray(parsedSecondarySkillId) ? parsedSecondarySkillId : (parsedSecondarySkillId != null ? [parsedSecondarySkillId] : []);
     const filteredSecondaryIds = secondaryIds.filter(id => id != null && id !== '' && id !== '0' && id !== 'none' && id !== 0);
 
-    for (const secondary of filteredSecondaryIds) {
+    const uniqueSecondaryIds = [...new Set(
+      filteredSecondaryIds.filter(
+        id => parseInt(id) !== parsedPrimarySkillId
+      )
+    )];
+    for (const secondary of uniqueSecondaryIds) {
       const parsedSecondaryId = parseInt(secondary);
       if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
       const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });
@@ -218,7 +223,7 @@ exports.createWorkerProfile = async (req, res) => {
     }
 
     user.skills = newSkills;
-    await user.save();
+
 
     const { workStateID, workCityID } = req.body;
 
@@ -226,6 +231,13 @@ exports.createWorkerProfile = async (req, res) => {
 
     if ((workStateID && !workState) || (workCityID && !workCity)) {
       return res.status(404).json({ success: false, message: 'Invalid work state or city' });
+    }
+
+    if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both state and city are required"
+      });
     }
 
     if (workState && workCity) {
@@ -243,17 +255,78 @@ exports.createWorkerProfile = async (req, res) => {
       if (isNaN(new Date(dateOfBirth).getTime())) {
         return res.status(400).json({ success: false, message: 'Invalid date of birth' });
       }
+
+      // Additional check to ensure DOB is not in the future
+      const dob = new Date(dateOfBirth);
+      if (
+        isNaN(dob.getTime()) ||
+        dob > new Date()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid DOB"
+        });
+      }
+
+      const age = new Date().getFullYear() - dob.getFullYear();
+
+      if (age < 18) {
+        return res.status(400).json({
+          success: false,
+          message: "Minimum age is 18"
+        });
+      }
+
+      user.dateOfBirth = dob;
     }
 
-    if (name) user.name = name;
-    if (dateOfBirth) user.dateOfBirth = dateOfBirth;
-    if (gender) user.gender = gender;
-    if (totalExperience) user.experience = totalExperience;
-    if (experienceDescription) user.experienceDescription = experienceDescription;
+
+    if (name) user.name = name.trim();
+
+    if (gender) {
+      const allowedGenders = ['male', 'female', 'other'];
+      if (!allowedGenders.includes(gender.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid gender"
+        });
+      }
+
+      user.gender = gender;
+    }
+
+    if (totalExperience !== undefined) {
+      const exp = Number(totalExperience);
+      if (isNaN(exp) || exp < 0 || exp > 60) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid experience"
+        });
+      }
+      user.experience = exp;
+    }
+
+    if (experienceDescription) {
+      if (experienceDescription.length > 1000) {
+        return res.status(400).json({ success: false, message: "Experience description must be less than 1000 characters" });
+      }
+      user.experienceDescription = experienceDescription.trim();
+    }
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
-    if (salaryType) user.salaryType = salaryType;
-    if (salary) user.salary = salary;
-    if (location) user.location = location;
+    if (salaryType) user.salaryType = salaryType.toLowerCase();
+
+    if (salary !== undefined) {
+      const parsedSalary = Number(salary);
+      if (isNaN(parsedSalary) || parsedSalary < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid salary"
+        });
+      }
+      user.salary = parsedSalary;
+    }
+
+    if (location) user.location = location.trim();
 
     user.primarySkill = primarySkillDoc.name;
     user.role = primarySkillDoc.name;
@@ -285,7 +358,7 @@ exports.editWorkerProfile = async (req, res) => {
     if (!user || user.userType !== 'worker') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    
+
     const { primarySkillId, secondarySkillId, otherSkill, name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, workStateID, workCityID } = req.body;
 
     if (primarySkillId) {
@@ -300,9 +373,16 @@ exports.editWorkerProfile = async (req, res) => {
       }
       const secondaryIds = Array.isArray(parsedSecondarySkillId) ? parsedSecondarySkillId : (parsedSecondarySkillId != null ? [parsedSecondarySkillId] : []);
       const filteredSecondaryIds = secondaryIds.filter(id => id != null && id !== '' && id !== '0' && id !== 'none' && id !== 0);
+
+      const uniqueSecondaryIds = [...new Set(
+        filteredSecondaryIds.filter(
+          id => parseInt(id) !== parsedPrimarySkillId
+        )
+      )];
+
       const newSkills = [];
 
-      for (const secondary of filteredSecondaryIds) {
+      for (const secondary of uniqueSecondaryIds) {
         const parsedSecondaryId = parseInt(secondary);
         if (isNaN(parsedSecondaryId)) return res.status(400).json({ success: false, message: 'Invalid secondary skill ID' });
         const secondarySkillDoc = await Skill.findOne({ id: parsedSecondaryId });
@@ -317,30 +397,98 @@ exports.editWorkerProfile = async (req, res) => {
       user.role = primarySkillDoc.name;
     }
 
+    if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both state and city are required"
+      });
+    }
+
     if (workStateID && workCityID) {
       const { workState, workCity } = getLocationByIds(workStateID, workCityID);
       if (workState) user.workState = workState;
       if (workCity) user.city = workCity;
     }
 
-    if (name) user.name = name;
+    if (name) user.name = name.trim();
     if (dateOfBirth) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(dateOfBirth)) return res.status(400).json({ success: false, message: 'Date of birth should be in format YYYY-MM-DD (Example: 2002-09-23)' });
       if (isNaN(new Date(dateOfBirth).getTime())) return res.status(400).json({ success: false, message: 'Invalid date of birth' });
-      user.dateOfBirth = dateOfBirth;
+
+      // Additional check to ensure DOB is not in the future
+      const dob = new Date(dateOfBirth);
+      if (
+        isNaN(dob.getTime()) ||
+        dob > new Date()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid DOB"
+        });
+      }
+
+      const age = new Date().getFullYear() - dob.getFullYear();
+
+      if (age < 18) {
+        return res.status(400).json({
+          success: false,
+          message: "Minimum age is 18"
+        });
+      }
+
+      user.dateOfBirth = dob;
     }
-    if (gender) user.gender = gender;
-    if (totalExperience) user.experience = totalExperience;
-    if (experienceDescription) user.experienceDescription = experienceDescription;
+
+    if (gender) {
+      const allowedGenders = ['male', 'female', 'other'];
+      if (!allowedGenders.includes(gender.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid gender"
+        });
+      }
+
+      user.gender = gender;
+    }
+
+    if (totalExperience !== undefined) {
+      const exp = Number(totalExperience);
+      if (isNaN(exp) || exp < 0 || exp > 60) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid experience"
+        });
+      }
+      user.experience = exp;
+    }
+
+    if (experienceDescription) {
+      if (experienceDescription.length > 1000) {
+        return res.status(400).json({ success: false, message: "Experience description must be less than 1000 characters" });
+      }
+      user.experienceDescription = experienceDescription.trim();
+    }
+
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType;
-    if (salary) user.salary = salary;
-    if (location) user.location = location;
+
+    if (salary !== undefined) {
+      const parsedSalary = Number(salary);
+      if (isNaN(parsedSalary) || parsedSalary < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid salary"
+        });
+      }
+      user.salary = parsedSalary;
+    }
+
+    if (location) user.location = location.trim();
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => {});
+        if (user.profileImage) fs.unlink(user.profileImage, () => { });
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.workSamplesPhoto) user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
@@ -368,7 +516,7 @@ exports.createVendorProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    
+
     if (user.userType && user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
     const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
@@ -377,21 +525,28 @@ exports.createVendorProfile = async (req, res) => {
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
     if (!designation) return res.status(400).json({ success: false, message: 'Designation is required' });
 
+    if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both state and city are required"
+      });
+    }
+
     if (workStateID && workCityID) {
       const { workState, workCity } = getLocationByIds(workStateID, workCityID);
       if (workState) user.workState = workState;
       if (workCity) user.city = workCity;
     }
 
-    if (companyName) user.companyName = companyName;
-    if (name) user.name = name;
+    if (companyName) user.companyName = companyName.trim();
+    if (name) user.name = name.trim();
     if (email) user.email = email;
-    if (designation) user.designation = designation;
-    if (workArea) user.workArea = workArea;
+    if (designation) user.designation = designation.trim();
+    if (workArea) user.workArea = workArea.trim();
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
-    if (website) user.website = website;
-    user.role = designation;
+    if (website) user.website = website.trim();
+    user.role = designation.trim();
     user.userType = 'vendor';
 
     if (req.files) {
@@ -421,34 +576,41 @@ exports.editVendorProfile = async (req, res) => {
 
     const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
 
+    if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both state and city are required"
+      });
+    }
+
     if (workStateID && workCityID) {
       const { workState, workCity } = getLocationByIds(workStateID, workCityID);
       if (workState) user.workState = workState;
       if (workCity) user.city = workCity;
     }
 
-    if (companyName) user.companyName = companyName;
-    if (name) user.name = name;
+    if (companyName) user.companyName = companyName.trim();
+    if (name) user.name = name.trim();
     if (email) user.email = email;
-    if (designation) { user.designation = designation; user.role = designation; }
-    if (workArea) user.workArea = workArea;
+    if (designation) { user.designation = designation.trim(); user.role = designation.trim(); }
+    if (workArea) user.workArea = workArea.trim();
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
-    if (website) user.website = website;
+    if (website) user.website = website.trim();
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => {});
+        if (user.profileImage) fs.unlink(user.profileImage, () => { });
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.companyLogo) {
-        if (user.companyLogo) fs.unlink(user.companyLogo, () => {});
+        if (user.companyLogo) fs.unlink(user.companyLogo, () => { });
         user.companyLogo = req.files.companyLogo[0].path;
       }
     }
 
     await user.save();
-    const savedUser=await User.findById(req.user.id);
+    const savedUser = await User.findById(req.user.id);
 
     res.json({
       success: true,
