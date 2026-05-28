@@ -1,8 +1,6 @@
 node_modules
 .env
-README.md
 uploads
-server.html
-README_JOB_ROUTES.md
-README_COMMUNITY_ROUTES.md
-profileController_README.md
+*.html
+*.md
+firebase-messaging-sw.js

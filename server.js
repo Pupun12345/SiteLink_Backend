@@ -1,6 +1,8 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const app = express();
-const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -14,10 +16,8 @@ const jobRoutes = require('./routes/jobRoutes');
 // const adminUserRoutes = require('./routes/adminUserRoutes');
 // const workerHomeRoutes = require('./routes/workerHomePage');
 // const systemRoutes = require('./routes/systemRoutes');
-// const notificationRoutes = require('./routes/notificationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 // const platformSettingRoutes = require('./routes/platformSettingRoutes');
-
-dotenv.config();
 
 connectDB();
 
@@ -47,13 +47,30 @@ app.use('/api/jobs', jobRoutes);
 // app.use('/api/admin', adminRoutes);
 // app.use('/api/worker', workerHomeRoutes);
 // app.use('/api/system', systemRoutes);
-// app.use('/api/notifications', notificationRoutes);
+app.use('/api/notifications', notificationRoutes);
 // app.use('/api/platform-settings', platformSettingRoutes);
 
 // Test auth page
 app.get('/test-auth', (req, res) => {
   res.sendFile(__dirname + '/server.html');
 });
+
+//TESTING PURPOSES
+// FCM Token page
+app.get('/get-fcm-token', (req, res) => {
+  res.sendFile(__dirname + '/get-fcm-token.html');
+});
+
+// Firebase service worker (must be served from root scope)
+app.get('/firebase-messaging-sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(__dirname + '/firebase-messaging-sw.js');
+});
+
+app.get('/get-fcm-token', (req, res) => {
+  res.sendFile(__dirname + '/get-fcm-token.html');
+});
+
 
 // Root route
 app.get('/', (req, res) => {
