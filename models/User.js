@@ -132,8 +132,6 @@ const userSchema = new mongoose.Schema({
   // Google / Social Auth
   firebaseUid: {
     type: String,
-    unique: true,
-    sparse: true,
     default: null,
   },
   authProvider: {
