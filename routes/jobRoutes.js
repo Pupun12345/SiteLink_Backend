@@ -5,6 +5,13 @@ const {
   getJobDetailsById,
   applyToJob,
   appliedJobs,
+  createJob,
+  likeUnlikeJob,
+  addJobComment,
+  updateJobComment,
+  deleteJobComment,
+  getJobComments,
+  deleteJob,
 } = require('../controllers/jobsController');
 const { protect,applicable } = require('../middleware/auth');
 
@@ -17,6 +24,21 @@ router.get('/:id', getJobDetailsById);
 // POST apply to job (protected)
 router.post('/:id/apply', protect,applicable, applyToJob);
 
-router.post("/:id/getAppliedJobs", protect, appliedJobs);
+router.get("/getAppliedJobs", protect, appliedJobs);
+
+// POST create job (protected)
+router.post('/', protect, createJob);
+
+// Like/Unlike a job
+router.put('/:id/like', protect, likeUnlikeJob);
+
+// Comments for jobs
+router.post('/:id/comments', protect, addJobComment);
+router.put('/:jobId/comments/:commentId', protect, updateJobComment);
+router.delete('/:jobId/comments/:commentId', protect, deleteJobComment);
+router.get('/:id/comments', getJobComments);
+
+// Delete job
+router.delete('/:id', protect, deleteJob);
 
 module.exports = router;

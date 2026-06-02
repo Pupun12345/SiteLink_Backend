@@ -24,7 +24,7 @@ const jobSchema = new mongoose.Schema(
     },
     salaryType: {
       type: String,
-      enum: ['daily', 'monthly'],
+      enum: ['daily', 'weekly', 'monthly'],
       default: 'daily',
     },
     isUrgent: {
@@ -55,13 +55,84 @@ const jobSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    likes: {
+      type: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+          },
+          likedAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
+    likesCount: {
+      type: Number,
+      default: 0,
+    },
+    comments: {
+      type: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+          },
+          userName: String,
+          userImage: String,
+          comment: String,
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
+    commentsCount: {
+      type: Number,
+      default: 0,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+    rejectionReason: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
+jobSchema.index({ postedBy: 1, createdAt: -1 });
+jobSchema.index({ isActive: 1, createdAt: -1 });
+
 // Generate job ID
-jobSchema.virtual('jobId').get(function() {
+jobSchema.virtual('jobId').get(function () {
   return `REQ-${this._id.toString().slice(-4).toUpperCase()}`;
+});
+
+// Add contentType virtual for unified feed
+jobSchema.virtual('contentType').get(function () {
+  return 'job';
 });
 
 jobSchema.set('toJSON', { virtuals: true });

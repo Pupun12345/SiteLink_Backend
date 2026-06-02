@@ -1,35 +1,35 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+const Job = require('../models/job');
 
-// @desc    Get community feed (posts from vendors and workers)
+// @desc    Get community feed (posts + jobs merged)
 // @route   GET /api/community/feed
 // @access  Private
 exports.getCommunityFeed = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const posterType = req.query.posterType || null;
-
-    let filter = { isActive: true, approvalStatus: 'approved' };
-
-    if (posterType) {
-      filter.posterType = posterType;
-    }
 
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find(filter)
-      .populate('postedBy', 'name profileImage')
-      .populate('likes.userId', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const filter = { isActive: true, approvalStatus: 'approved' };
 
-    const total = await Post.countDocuments(filter);
+    const [posts, jobs] = await Promise.all([
+      Post.find(filter)
+        .populate('postedBy', 'name profileImage')
+        .populate('likes.userId', 'name')
+        .sort({ createdAt: -1 })
+        .lean(),
+      Job.find(filter)
+        .populate('postedBy', 'name profileImage companyName')
+        .populate('likes.userId', 'name')
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
 
-    // Format posts for UI display
     const formattedPosts = posts.map(post => ({
+      type: 'post',
       _id: post._id,
       content: post.content,
       images: post.images,
@@ -43,19 +43,52 @@ exports.getCommunityFeed = async (req, res) => {
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
       createdAt: post.createdAt,
-      likes: post.likes.map(like => ({
+      likes: (post.likes || []).map(like => ({
         userId: like.userId?._id,
         userName: like.userId?.name,
       })),
     }));
 
+    const formattedJobs = jobs.map(job => ({
+      type: 'job',
+      _id: job._id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary,
+      salaryType: job.salaryType,
+      isUrgent: job.isUrgent,
+      duration: job.duration || null,
+      description: job.description,
+      experience: job.experience,
+      workersNeeded: job.quantity,
+      applicationsCount: job.applicationsCount,
+      posterName: job.postedBy?.name || null,
+      posterImage: job.postedBy?.profileImage || null,
+      companyName: job.postedBy?.companyName || job.company,
+      postedBy: job.postedBy?._id,
+      likesCount: job.likesCount,
+      commentsCount: job.commentsCount,
+      createdAt: job.createdAt,
+      likes: (job.likes || []).map(like => ({
+        userId: like.userId?._id,
+        userName: like.userId?.name,
+      })),
+    }));
+
+    const items = [...formattedPosts, ...formattedJobs]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const total = items.length;
+    const paginated = items.slice(skip, skip + limit);
+
     res.status(200).json({
       success: true,
-      data: formattedPosts,
+      data: paginated,
       pagination: {
         current: page,
-        limit: limit,
-        total: total,
+        limit,
+        total,
         pages: Math.ceil(total / limit),
       },
     });
@@ -67,6 +100,7 @@ exports.getCommunityFeed = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Create a community post
 // @route   POST /api/community/posts
@@ -548,4 +582,3 @@ exports.getCommentsByPost = async (req, res) => {
     });
   }
 };
-

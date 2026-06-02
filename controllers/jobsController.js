@@ -1,19 +1,40 @@
 const Job = require('../models/job');
 const User = require('../models/User');
 const Application = require('../models/Application');
+const Comment = require('../models/Comment');
+const mongoose = require('mongoose');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
 // @access  Public
 exports.getJobs = async (req, res) => {
   try {
-    const { location, search, salaryType, category, sort } = req.query;
+    const { location, search, salaryType, sort } = req.query;
 
     let filter = {};
 
     if (location) filter.location = { $regex: location, $options: 'i' };
-    if (salaryType) filter.salaryType = salaryType;
-    if (category) filter.title = { $regex: category, $options: 'i' };
+
+    if (salaryType) {
+      const allowedTypes = [
+        'daily',
+        'weekly',
+        'monthly'
+      ];
+      if (
+        !allowedTypes.includes(
+          salaryType.toLowerCase()
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid salary type.Salary type must be one of: daily, weekly, monthly',
+        });
+      }
+      filter.salaryType =
+        salaryType.toLowerCase();
+    }
+
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -48,6 +69,12 @@ exports.getJobs = async (req, res) => {
           salaryType: job.salaryType,
           isUrgent: job.isUrgent,
           postedAt: job.createdAt,
+          postedBy: {
+            id: job.postedBy?._id,
+            name: job.postedBy?.name,
+            designation: job.postedBy?.designation,
+            companyName: job.postedBy?.companyName
+          }
         };
       })
     );
@@ -73,8 +100,43 @@ exports.getJobs = async (req, res) => {
 exports.applyToJob = async (req, res) => {
   try {
     const { id: jobId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Job ID'
+      });
+    }
+
     const applicantId = req.user.id;
     const { coverLetter, experience } = req.body;
+
+    if (isNaN(experience)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Experience value.Experience must be a number'
+      });
+    }
+
+
+    const exp = Number(experience);
+    if (exp < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Experience must be a non-negative number'
+      });
+    }
+
+
+    if (
+      coverLetter &&
+      coverLetter.length > 1000
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cover letter must be less than 1000 characters'
+      });
+    }
 
     // Check if job exists
     const job = await Job.findById(jobId);
@@ -85,12 +147,35 @@ exports.applyToJob = async (req, res) => {
       });
     }
 
-    // Check if user is a worker
     const user = await User.findById(applicantId);
+
+    //check if user is exist or not
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is a worker
     if (user.userType !== 'worker') {
       return res.status(403).json({
         success: false,
         message: 'Only workers can apply to jobs',
+      });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is not verified yet. Please wait for verification before applying to jobs.',
+      });
+    }
+
+    if (job.status === 'Closed' || job.status === 'Cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Job is closed'
       });
     }
 
@@ -109,13 +194,15 @@ exports.applyToJob = async (req, res) => {
     const application = await Application.create({
       job: jobId,
       applicant: applicantId,
-      coverLetter,
-      experience,
+      coverLetter: coverLetter?.trim(),
+      experience: exp,
     });
 
-    await Job.findByIdAndUpdate(jobId, {
-      $inc: { applicationsCount: 1 }
+    const count = await Application.countDocuments({
+      job: jobId
     });
+    job.applicationsCount = count;
+    await job.save();
 
     await application.populate('applicant', 'name profileImage userType');
 
@@ -134,14 +221,21 @@ exports.applyToJob = async (req, res) => {
 };
 
 // @desc    Get Job Details by ID
-// @route   POST /api/jobs/:id/getJobDetails
+// @route   GET /api/jobs/:id/getJobDetails
 // @access  Private
 exports.getJobDetailsById = async (req, res) => {
   try {
     const { id } = req.params;
-    const job = await Job.findById(id)
-      .populate('postedBy', 'title comapany location quantity salary salaryType isUrgent duration description experience')
-      .lean();
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Job ID'
+      });
+    }
+
+
+    const job = await Job.findById(id).select("title companyName location quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").lean();
 
     if (!job) {
       return res.status(404).json({
@@ -163,11 +257,18 @@ exports.getJobDetailsById = async (req, res) => {
 }
 
 // @desc    Get Applied Job Details by ID
-// @route   POST /api/jobs/:id/getAppliedJobs
+// @route   GET /api/jobs/getAppliedJobs
 // @access  Private
 exports.appliedJobs = async (req, res) => {
   try {
-    const { id: applicantID } = req.params;
+    const applicantID = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(applicantID)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Applicant ID'
+      });
+    }
 
     const data = await Application.find({ applicant: applicantID })
       .populate('job', 'title company location salary salaryType isUrgent duration description experience')
@@ -186,3 +287,353 @@ exports.appliedJobs = async (req, res) => {
     });
   }
 }
+
+// @desc    Create a new job
+// @route   POST /api/jobs
+// @access  Private
+exports.createJob = async (req, res) => {
+  try {
+    const { title, company, location, quantity, salary, salaryType, isUrgent, duration, description, experience } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account verification required for posting jobs. Please wait for your account to be verified before creating a job.'
+      });
+    }
+
+    if (user.userType === 'worker' || user.userType === 'customer') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Vendor or Admin can create jobs'
+      });
+    }
+
+    if (!title || !company || !location || !description || !experience) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+
+    if (salaryType && !['daily', 'weekly', 'monthly'].includes(salaryType.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid salary type.Salary type must be one of: daily, weekly, monthly',
+      });
+    }
+
+    const parsedSalary = Number(salary);
+    if (
+      isNaN(parsedSalary) ||
+      parsedSalary < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid salary'
+      });
+    }
+
+    if (experience && isNaN(experience)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Experience value.Experience must be a number'
+      });
+    }
+
+    const exp = Number(experience);
+    if (
+      isNaN(exp) ||
+      exp < 0 ||
+      exp > 60
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Experience must be between 0 and 60 years'
+      });
+    }
+
+    const workersNeeded = Number(quantity);
+    if (
+      isNaN(workersNeeded) ||
+      workersNeeded <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be greater than 0'
+      });
+    }
+
+    const job = await Job.create({
+      title: title.trim(),
+      company: company.trim(),
+      location: location.trim(),
+      quantity: workersNeeded,
+      salary: parsedSalary,
+      salaryType: salaryType,
+      isUrgent: isUrgent,
+      duration: duration,
+      description: description.trim(),
+      experience: exp,
+      postedBy: req.user.id,
+      isActive: true,
+      approvalStatus: 'approved',
+      autoApproved: true,
+      approvedAt: new Date(),
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Job created and published successfully',
+      data: job,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create job',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Like/Unlike a job
+// @route   PUT /api/jobs/:id/like
+// @access  Private
+exports.likeUnlikeJob = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    const likeIndex = job.likes.findIndex(like => like.userId.toString() === userId.toString());
+
+    if (likeIndex > -1) {
+      job.likes.splice(likeIndex, 1);
+      job.likesCount = Math.max(0, job.likesCount - 1);
+    } else {
+      job.likes.push({ userId, likedAt: new Date() });
+      job.likesCount = (job.likesCount || 0) + 1;
+    }
+
+    await job.save();
+
+    res.status(200).json({
+      success: true,
+      message: likeIndex > -1 ? 'Job unliked' : 'Job liked',
+      data: { _id: job._id, likesCount: job.likesCount },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error liking/unliking job', error: error.message });
+  }
+};
+
+// Helper to format a comment
+function _formatComment(c) {
+  return {
+    _id: c._id,
+    comment: c.comment,
+    userId: c.userId._id,
+    userName: c.userId.name,
+    userImage: c.userId.profileImage || null,
+    userType: c.userId.userType,
+    isVerified: c.userId.verificationStatus === 'verified',
+    likesCount: c.likesCount,
+    isEdited: c.isEdited,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+}
+
+// @desc    Add comment to a job
+// @route   POST /api/jobs/:id/comments
+// @access  Private
+exports.addJobComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, parentComment = null } = req.body;
+    const userId = req.user.id;
+
+    if (!comment || comment.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Comment cannot be empty' });
+    }
+    if (comment.length > 500) {
+      return res.status(400).json({ success: false, message: 'Comment cannot exceed 500 characters' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+    const commentData = { userId, comment: comment.trim(), parentComment, jobId: id };
+    const newComment = await Comment.create(commentData);
+    await newComment.populate('userId', 'name profileImage userType verificationStatus');
+    job.commentsCount = (job.commentsCount || 0) + 1;
+    await job.save();
+
+    res.status(201).json({
+      success: true,
+      message: parentComment ? 'Reply added successfully' : 'Comment added successfully',
+      data: _formatComment(newComment),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to add comment', error: error.message });
+  }
+};
+
+// @desc    Update a job comment
+// @route   PUT /api/jobs/:jobId/comments/:commentId
+// @access  Private
+exports.updateJobComment = async (req, res) => {
+  try {
+    const { jobId, commentId } = req.params;
+    const { comment } = req.body;
+    const userId = req.user.id;
+
+    if (!comment || comment.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Comment cannot be empty' });
+    }
+
+    if (comment.length > 500) {
+      return res.status(400).json({ success: false, message: 'Comment cannot exceed 500 characters' });
+    }
+
+    const existingComment = await Comment.findOne({ _id: commentId, jobId, status: 'active' }).populate('userId', 'name profileImage userType verificationStatus');
+
+    if (!existingComment) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    if (existingComment.userId._id.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this comment' });
+    }
+
+    existingComment.comment = comment.trim();
+    existingComment.isEdited = true;
+    existingComment.editedAt = new Date();
+    await existingComment.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Comment updated successfully',
+      data: _formatComment(existingComment),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update comment', error: error.message });
+  }
+};
+
+// @desc    Delete a job comment
+// @route   DELETE /api/jobs/:jobId/comments/:commentId
+// @access  Private
+exports.deleteJobComment = async (req, res) => {
+  try {
+    const { jobId, commentId } = req.params;
+    const userId = req.user.id;
+
+    const comment = await Comment.findOne({ _id: commentId, jobId, status: 'active' });
+
+    if (!comment) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    if (comment.userId.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' });
+    }
+
+    comment.status = 'deleted';
+    await comment.save();
+
+    res.status(200).json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete comment', error: error.message });
+  }
+};
+
+// @desc    Get comments for a job
+// @route   GET /api/jobs/:id/comments
+// @access  Public
+exports.getJobComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10, sortBy = 'newest' } = req.query;
+
+    const job = await Job.findById(id).lean();
+    if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+    const filter = { jobId: id, parentComment: null, status: 'active' };
+
+    const sortMap = { oldest: { createdAt: 1 }, popular: { likesCount: -1, createdAt: -1 } };
+    const sortCriteria = sortMap[sortBy] || { createdAt: -1 };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const comments = await Comment.find(filter)
+      .populate('userId', 'name profileImage userType verificationStatus')
+      .populate({
+        path: 'replies',
+        match: { status: 'active' },
+        populate: { path: 'userId', select: 'name profileImage userType verificationStatus' },
+        options: { sort: { createdAt: 1 }, limit: 3 }
+      })
+      .sort(sortCriteria)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalComments = await Comment.countDocuments(filter);
+
+    const transformedComments = comments.map(comment => ({
+      ..._formatComment(comment),
+      editedAt: comment.editedAt,
+      replies: (comment.replies || []).map(reply => ({
+        ..._formatComment(reply),
+        editedAt: reply.editedAt,
+      }))
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: transformedComments,
+      pagination: {
+        current: parseInt(page),
+        limit: parseInt(limit),
+        total: totalComments,
+        pages: Math.ceil(totalComments / parseInt(limit))
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch comments', error: error.message });
+  }
+};
+
+// @desc    Delete a job
+// @route   DELETE /api/jobs/:id
+// @access  Private
+exports.deleteJob = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+    if (job.postedBy?.toString() !== userId && req.user.userType !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Unauthorized to delete this job' });
+    }
+
+    await Job.findByIdAndDelete(id);
+
+    res.status(200).json({ success: true, message: 'Job deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete job', error: error.message });
+  }
+};
