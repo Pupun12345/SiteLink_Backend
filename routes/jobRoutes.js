@@ -18,13 +18,13 @@ const { protect,applicable } = require('../middleware/auth');
 // GET all jobs
 router.get('/', getJobs);
 
+router.get("/getAppliedJobs", protect, appliedJobs);
+
 // GET single job
 router.get('/:id', getJobDetailsById);
 
 // POST apply to job (protected)
 router.post('/:id/apply', protect,applicable, applyToJob);
-
-router.get("/getAppliedJobs", protect, appliedJobs);
 
 // POST create job (protected)
 router.post('/', protect, createJob);
