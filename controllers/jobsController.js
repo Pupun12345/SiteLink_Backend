@@ -11,7 +11,7 @@ exports.getJobs = async (req, res) => {
   try {
     const { location, search, salaryType, sort } = req.query;
 
-    let filter = {};
+    let filter = { "approvalStatus": "approved" };
 
     if (location) filter.location = { $regex: location, $options: 'i' };
 
