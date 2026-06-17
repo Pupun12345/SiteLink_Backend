@@ -47,6 +47,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  isProfileCreated: {
+    type: Boolean,
+    default: false,
+  },
   // Worker-specific fields
   dateOfBirth: { type: Date, default: null },
   gender: { type: String, enum: ['Male', 'Female', 'Other'], default: null },
@@ -105,11 +109,6 @@ const userSchema = new mongoose.Schema({
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
       'Please provide a valid GST number',
     ],
-  },
-  projectTypes: {
-    type: [String],
-    enum: ['Residential Building', 'Commercial Building', 'Industrial Project', 'Infrastructure', 'Renovation', 'Interior Design'],
-    default: [],
   },
   website: {
     type: String,

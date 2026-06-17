@@ -156,7 +156,7 @@ exports.getProfile = async (req, res) => {
         gstNumber: regularUser.gstNumber,
         companyName: regularUser.companyName,
         companyLogo: regularUser.companyLogo,
-        designation: regularUser.designation,
+        designation: regularUser.role,
         workArea: regularUser.workArea,
         whatsappNumber: regularUser.whatsappNumber,
         website: regularUser.website,
@@ -331,6 +331,7 @@ exports.createWorkerProfile = async (req, res) => {
     user.primarySkill = primarySkillDoc.name;
     user.role = primarySkillDoc.name;
     user.userType = 'worker';
+    user.isProfileCreated = true;
 
     if (req.files) {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
@@ -338,13 +339,12 @@ exports.createWorkerProfile = async (req, res) => {
       if (req.files.experienceCertificate) user.experienceCertificate = req.files.experienceCertificate[0].path;
       if (req.files.governmentID) user.governmentID = req.files.governmentID[0].path;
     }
-
     await user.save();
 
     res.json({
       success: true,
       message: 'Worker profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, workCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, isVerified: user.isVerified, verificationStatus: user.verificationStatus }
+      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, workCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, isVerified: user.isVerified, verificationStatus: user.verificationStatus, isProfileCreated: user.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -502,7 +502,7 @@ exports.editWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -541,13 +541,13 @@ exports.createVendorProfile = async (req, res) => {
     if (companyName) user.companyName = companyName.trim();
     if (name) user.name = name.trim();
     if (email) user.email = email;
-    if (designation) user.designation = designation.trim();
+    if (designation) user.role = designation.trim();
     if (workArea) user.workArea = workArea.trim();
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
     if (website) user.website = website.trim();
-    user.role = designation.trim();
     user.userType = 'vendor';
+    user.isProfileCreated = true;
 
     if (req.files) {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
@@ -560,7 +560,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.designation, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -592,7 +592,7 @@ exports.editVendorProfile = async (req, res) => {
     if (companyName) user.companyName = companyName.trim();
     if (name) user.name = name.trim();
     if (email) user.email = email;
-    if (designation) { user.designation = designation.trim(); user.role = designation.trim(); }
+    if (designation) { user.role = designation.trim(); }
     if (workArea) user.workArea = workArea.trim();
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
@@ -615,7 +615,7 @@ exports.editVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.designation, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

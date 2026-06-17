@@ -63,6 +63,8 @@ exports.getJobs = async (req, res) => {
           title: job.title,
           company: job.company,
           location: job.location,
+          latitude: job.latitude,
+          longitude: job.longitude,
           workersNeeded: job.quantity,
           duration: job.duration || null,
           salary: job.salary,
@@ -235,7 +237,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title companyName location quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").lean();
+    const job = await Job.findById(id).select("title companyName location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").lean();
 
     if (!job) {
       return res.status(404).json({
@@ -271,7 +273,7 @@ exports.appliedJobs = async (req, res) => {
     }
 
     const data = await Application.find({ applicant: applicantID })
-      .populate('job', 'title company location salary salaryType isUrgent duration description experience')
+      .populate('job', 'title company location latitude longitude salary salaryType isUrgent duration description experience')
       .lean();
 
     res.status(200).json({
@@ -293,7 +295,7 @@ exports.appliedJobs = async (req, res) => {
 // @access  Private
 exports.createJob = async (req, res) => {
   try {
-    const { title, company, location, quantity, salary, salaryType, isUrgent, duration, description, experience } = req.body;
+    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -376,6 +378,8 @@ exports.createJob = async (req, res) => {
       title: title.trim(),
       company: company.trim(),
       location: location.trim(),
+      latitude: latitude.trim(),
+      longitude: longitude.trim(),
       quantity: workersNeeded,
       salary: parsedSalary,
       salaryType: salaryType,
