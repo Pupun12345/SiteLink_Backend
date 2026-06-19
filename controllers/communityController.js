@@ -116,11 +116,11 @@ exports.createPost = async (req, res) => {
     }
 
     const images = req.files?.images
-      ? req.files.images.map(file => `/uploads/posts/${file.filename}`)
+      ? req.files.images.map(file => file.path)
       : [];
 
     const video = req.files?.video?.[0]
-      ? `/uploads/posts/${req.files.video[0].filename}`
+      ? req.files.video[0].path
       : null;
 
     const postData = {
@@ -383,7 +383,7 @@ exports.updateComment = async (req, res) => {
       });
     }
 
-    if (existingComment.userId._id.toString() !== userId ) {
+    if (existingComment.userId._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this comment',
@@ -509,19 +509,19 @@ exports.getCommentsByPost = async (req, res) => {
       parentComment: null,
       status: 'active'
     })
-    .populate('userId', 'name profileImage userType verificationStatus')
-    .populate({
-      path: 'replies',
-      match: { status: 'active' },
-      populate: {
-        path: 'userId',
-        select: 'name profileImage userType verificationStatus'
-      },
-      options: { sort: { createdAt: 1 }, limit: 3 }
-    })
-    .sort(sortCriteria)
-    .skip(skip)
-    .limit(parseInt(limit));
+      .populate('userId', 'name profileImage userType verificationStatus')
+      .populate({
+        path: 'replies',
+        match: { status: 'active' },
+        populate: {
+          path: 'userId',
+          select: 'name profileImage userType verificationStatus'
+        },
+        options: { sort: { createdAt: 1 }, limit: 3 }
+      })
+      .sort(sortCriteria)
+      .skip(skip)
+      .limit(parseInt(limit));
 
     const totalComments = await Comment.countDocuments({
       postId,

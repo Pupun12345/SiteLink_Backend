@@ -1,6 +1,5 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
-const fs = require('fs');
 const Skill = require('../models/Skill');
 const { verify } = require('crypto');
 const Post = require('../models/Post');
@@ -488,7 +487,6 @@ exports.editWorkerProfile = async (req, res) => {
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => { });
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.workSamplesPhoto) user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
@@ -600,11 +598,9 @@ exports.editVendorProfile = async (req, res) => {
 
     if (req.files) {
       if (req.files.profileImage) {
-        if (user.profileImage) fs.unlink(user.profileImage, () => { });
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.companyLogo) {
-        if (user.companyLogo) fs.unlink(user.companyLogo, () => { });
         user.companyLogo = req.files.companyLogo[0].path;
       }
     }
