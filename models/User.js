@@ -127,6 +127,16 @@ const userSchema = new mongoose.Schema({
       'Please provide a valid 10-digit WhatsApp number',
     ],
   },
+  panNumber: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: null,
+    match: [
+      /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+      'Please provide a valid PAN number',
+    ]
+  },
 
   // Google / Social Auth
   firebaseUid: {
@@ -150,6 +160,15 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false,
+  },
+  subscription: {
+    type: Boolean,
+    default: false,
+  },
+  subscriptionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subscription',
+    default: null,
   },
   verificationStatus: {
     type: String,

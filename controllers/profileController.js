@@ -517,11 +517,13 @@ exports.createVendorProfile = async (req, res) => {
 
     if (user.userType && user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID,panNumber } = req.body;
 
     if (!companyName) return res.status(400).json({ success: false, message: 'Company name is required' });
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
     if (!designation) return res.status(400).json({ success: false, message: 'Designation is required' });
+    if (!panNumber) return res.status(400).json({ success: false, message: 'PanNumber is required' });
+
 
     if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
       return res.status(400).json({
@@ -544,6 +546,7 @@ exports.createVendorProfile = async (req, res) => {
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
     if (website) user.website = website.trim();
+    if(panNumber) user.panNumber=panNumber;
     user.userType = 'vendor';
     user.isProfileCreated = true;
 
@@ -558,7 +561,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website,panNumber:savedUser.panNumber, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -572,7 +575,7 @@ exports.editVendorProfile = async (req, res) => {
 
     if (!user || user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID,panNumber } = req.body;
 
     if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
       return res.status(400).json({
@@ -595,6 +598,7 @@ exports.editVendorProfile = async (req, res) => {
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
     if (website) user.website = website.trim();
+    if(panNumber) user.panNumber=panNumber;
 
     if (req.files) {
       if (req.files.profileImage) {
@@ -611,7 +615,7 @@ exports.editVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber,panNumber:savedUser.panNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
