@@ -1,63 +1,57 @@
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const { v2: cloudinary } = require('cloudinary');
+const cloudinary = require('../config/cloudinary');
 
-// Lazy initialization function
-const createStorage = () => {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    const folderMap = {
+      profileImage: 'profiles',
+      companyLogo: 'profiles',
+      governmentID: 'documents',
+      aadhaarFrontImage: 'documents',
+      aadhaarBackImage: 'documents',
+      panCardImage: 'documents',
+      images: 'posts',
+      video: 'posts',
+    };
 
-  return new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-      const folderMap = {
-        profileImage: 'uploads/profiles',
-        companyLogo: 'uploads/profiles',
-        workSamplesPhoto: 'uploads/posts',
-        governmentID: 'uploads/documents',
-        experienceCertificate: 'uploads/documents',
-        images: 'uploads/posts',
-        video: 'uploads/posts'
-      };
+    const prefixMap = {
+      profileImage: 'profile',
+      companyLogo: 'company-logo',
+      aadhaarFrontImage: 'aadhaar-front',
+      aadhaarBackImage: 'aadhaar-back',
+      panCardImage: 'pan-card',
+      images: 'post',
+      video: 'post',
+    };
 
-      const prefixMap = {
-        profileImage: 'profile',
-        companyLogo: 'company-logo',
-        workSamplesPhoto: 'work-sample',
-        governmentID: 'document',
-        experienceCertificate: 'experience',
-        images: 'post',
-        video: 'post'
-      };
-      
-      const folder = folderMap[file.fieldname] || 'misc';
-      const prefix = prefixMap[file.fieldname] || 'file';
-      const isVideo = file.mimetype.startsWith('video/');
+    const folder = folderMap[file.fieldname] || 'misc';
+    const prefix = prefixMap[file.fieldname] || 'file';
+    const isVideo = file.mimetype && file.mimetype.startsWith('video/');
 
-      return {
-        folder: folder,
-        public_id: `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
-        resource_type: isVideo ? 'video' : 'auto',
-      };
-    },
-  });
-};
+    return {
+      folder: folder,
+      public_id: `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+      resource_type: isVideo ? 'video' : 'auto',
+    };
+  },
+});
 
 const upload = multer({
-  storage: createStorage(),
+  storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 const handleUpload = (uploadMiddleware) => (req, res, next) => {
   uploadMiddleware(req, res, (err) => {
-    if (err) return res.status(400).json({ success: false, message: err.message });
+    if (err) {
+      console.error('Upload error:', err);
+      return res.status(400).json({ success: false, message: err.message || 'File upload failed' });
+    }
     next();
   });
 };
 
 module.exports = upload;
 module.exports.handleUpload = handleUpload;
-
