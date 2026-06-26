@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Application = require('../models/Application');
 const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
+const amenities = require('../models/amenities');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
@@ -53,6 +54,7 @@ exports.getJobs = async (req, res) => {
 
     const jobs = await Job.find(filter)
       .populate('postedBy', 'name companyName')
+      .populate("amenities", "id name category icon")
       .sort(sortOrder)
       .lean();
 
@@ -237,7 +239,8 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title companyName location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").lean();
+    const job = await Job.findById(id).select("title companyName location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
+      .lean();
 
     if (!job) {
       return res.status(404).json({
@@ -361,6 +364,27 @@ exports.createJob = async (req, res) => {
         success: false,
         message: 'Experience must be between 0 and 60 years'
       });
+    }
+
+    // Validate Amenities
+    if (!Array.isArray(amenities)) {
+      return res.status(400).json({
+        success: false,
+        message: "Amenities must be an array."
+      });
+    }
+
+    if (amenities.length > 0) {
+      const validAmenities = await Amenity.countDocuments({
+        _id: { $in: amenities }
+      });
+
+      if (validAmenities !== amenities.length) {
+        return res.status(400).json({
+          success: false,
+          message: "One or more selected amenities are invalid."
+        });
+      }
     }
 
     const workersNeeded = Number(quantity);
@@ -639,5 +663,284 @@ exports.deleteJob = async (req, res) => {
     res.status(200).json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete job', error: error.message });
+  }
+};
+
+
+
+exports.fetchAllAmenities = async (req, res) => {
+  try {
+    const data = await amenities.find().sort({ category: 1, id: 1 });
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch amenities",
+      error: error.message,
+    });
+  }
+};
+
+exports.getGroupedAmenities = async (req, res) => {
+  try {
+    const data = await amenities
+      .find()
+      .sort({ category: 1, id: 1 })
+      .select("_id id name category icon");
+
+    const grouped = {};
+
+    data.forEach((amenity) => {
+      if (!grouped[amenity.category]) {
+        grouped[amenity.category] = {
+          category: amenity.category,
+          icon: amenity.icon,
+          amenities: [],
+        };
+      }
+
+      grouped[amenity.category].amenities.push({
+        _id: amenity._id,
+        id: amenity.id,
+        name: amenity.name,
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Object.values(grouped),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch amenities",
+      error: error.message,
+    });
+  }
+};
+
+exports.getAllCategories = async (req, res) => {
+  try {
+    const categories = await amenities.distinct("category");
+    return res.status(200).json({
+      success: true,
+      data: categories,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+exports.addAmenities = async (req, res) => {
+  try {
+    const { name, category } = req.body;
+
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select("userType");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (
+      user.userType === "worker" ||
+      user.userType === "customer"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to add amenities",
+      });
+    }
+
+    const CATEGORY_ICONS = {
+      "Financial Benefits": "💰",
+      "Accommodation & Food": "🏠",
+      "Travel": "🚌",
+      "Safety & Medical": "🛡️",
+      "Leave": "📅",
+      "Work & Career": "📈",
+      "Employee Rewards": "🏆",
+    };
+
+    if (!CATEGORY_ICONS[category]) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category",
+      });
+    }
+
+    const existingAmenity = await amenities.findOne({ name });
+
+    if (existingAmenity) {
+      return res.status(400).json({
+        success: false,
+        message: "Amenity already exists",
+      });
+    }
+
+    const lastAmenity = await amenities.findOne().sort({ id: -1 });
+
+    const nextId = lastAmenity ? lastAmenity.id + 1 : 1;
+
+    const amenity = await amenities.create({
+      id: nextId,
+      name,
+      category,
+      icon: CATEGORY_ICONS[category],
+      createdBy: userId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Amenity added successfully",
+      data: amenity,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+exports.updateAmenity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category } = req.body;
+
+    const user = await User.findById(req.user.id).select("userType");
+
+    if (!user || user.userType !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admin can update amenities",
+      });
+    }
+
+    const CATEGORY_ICONS = {
+      "Financial Benefits": "💰",
+      "Accommodation & Food": "🏠",
+      "Travel": "🚌",
+      "Safety & Medical": "🛡️",
+      "Leave": "📅",
+      "Work & Career": "📈",
+      "Employee Rewards": "🏆",
+    };
+
+    if (category && !CATEGORY_ICONS[category]) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category",
+      });
+    }
+
+    // Prevent duplicate names
+    if (name) {
+      const existingAmenity = await amenities.findOne({
+        name,
+        _id: { $ne: id },
+      });
+
+      if (existingAmenity) {
+        return res.status(400).json({
+          success: false,
+          message: "Amenity with this name already exists",
+        });
+      }
+    }
+
+    const amenity = await amenities.findByIdAndUpdate(
+      id,
+      {
+        ...(name && { name }),
+        ...(category && {
+          category,
+          icon: CATEGORY_ICONS[category],
+        }),
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!amenity) {
+      return res.status(404).json({
+        success: false,
+        message: "Amenity not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Amenity updated successfully",
+      data: amenity,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteAmenity = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(req.user.id).select("userType");
+
+    if (!user || user.userType !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admin can delete amenities",
+      });
+    }
+
+    // Check if any job is using this amenity
+    const jobUsingAmenity = await Job.findOne({
+      amenities: id,
+    });
+
+    if (jobUsingAmenity) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot delete amenity because it is being used in one or more jobs.",
+      });
+    }
+
+    const amenity = await amenities.findByIdAndDelete(id);
+
+    if (!amenity) {
+      return res.status(404).json({
+        success: false,
+        message: "Amenity not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Amenity deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };

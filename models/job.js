@@ -126,6 +126,12 @@ const jobSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    amenities: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Amenities"
+      }
+    ],
   },
   { timestamps: true }
 );
