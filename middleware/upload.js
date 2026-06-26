@@ -40,7 +40,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 const handleUpload = (uploadMiddleware) => (req, res, next) => {

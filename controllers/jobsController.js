@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Application = require('../models/Application');
 const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
-const amenities = require('../models/amenities');
+const Amenity = require('../models/amenities');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
@@ -72,6 +72,7 @@ exports.getJobs = async (req, res) => {
           salary: job.salary,
           salaryType: job.salaryType,
           isUrgent: job.isUrgent,
+          amenities: job.amenities,
           postedAt: job.createdAt,
           postedBy: {
             id: job.postedBy?._id,
@@ -239,7 +240,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title companyName location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -298,7 +299,7 @@ exports.appliedJobs = async (req, res) => {
 // @access  Private
 exports.createJob = async (req, res) => {
   try {
-    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience,amenities } = req.body;
+    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience, amenities } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -367,24 +368,25 @@ exports.createJob = async (req, res) => {
     }
 
     // Validate Amenities
+    let amenityObjectIds = [];
     if (!Array.isArray(amenities)) {
       return res.status(400).json({
         success: false,
-        message: "Amenities must be an array."
+        message: "Amenities must be an array.",
       });
     }
-
     if (amenities.length > 0) {
-      const validAmenities = await Amenity.countDocuments({
-        _id: { $in: amenities }
-      });
+      const amenityDocs = await Amenity.find({
+        id: { $in: amenities },
+      }).select("_id");
 
-      if (validAmenities !== amenities.length) {
+      if (amenityDocs.length !== amenities.length) {
         return res.status(400).json({
           success: false,
-          message: "One or more selected amenities are invalid."
+          message: "One or more selected amenities are invalid.",
         });
       }
+      amenityObjectIds = amenityDocs.map((amenity) => amenity._id);
     }
 
     const workersNeeded = Number(quantity);
@@ -410,6 +412,7 @@ exports.createJob = async (req, res) => {
       isUrgent: isUrgent,
       duration: duration,
       description: description.trim(),
+      amenities: amenityObjectIds,
       experience: exp,
       postedBy: req.user.id,
       isActive: true,

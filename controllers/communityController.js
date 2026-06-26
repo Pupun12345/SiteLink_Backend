@@ -119,9 +119,7 @@ exports.createPost = async (req, res) => {
       ? req.files.images.map(file => file.path)
       : [];
 
-    const video = req.files?.video?.[0]
-      ? req.files.video[0].path
-      : null;
+    const video = req.files?.video?.[0]?.path || null;
 
     const postData = {
       content,
