@@ -298,7 +298,7 @@ exports.appliedJobs = async (req, res) => {
 // @access  Private
 exports.createJob = async (req, res) => {
   try {
-    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience } = req.body;
+    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience,amenities } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
