@@ -16,24 +16,6 @@ const applicationSchema = new mongoose.Schema({
     enum: ['pending', 'shortlisted', 'rejected', 'hired'],
     default: 'pending',
   },
-  coverLetter: {
-    type: String,
-    maxlength: 1000,
-  },
-  experience: {
-    type: String,
-  },
-  reviewedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  reviewedAt: {
-    type: Date,
-  },
-  notes: {
-    type: String,
-    maxlength: 500,
-  },
 }, {
   timestamps: true,
 });

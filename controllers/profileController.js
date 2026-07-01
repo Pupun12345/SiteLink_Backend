@@ -140,6 +140,10 @@ exports.getProfile = async (req, res) => {
         userType: regularUser.userType,
         createdAt: regularUser.createdAt,
         location: regularUser.location,
+        dateOfBirth: regularUser.dateOfBirth,
+        experienceCertificate: regularUser.experienceCertificate,
+        isPhoneVerified: regularUser.isPhoneVerified,
+        isVerified: regularUser.isVerified,
       }
       : {
         id: regularUser._id,
@@ -159,6 +163,11 @@ exports.getProfile = async (req, res) => {
         workArea: regularUser.workArea,
         whatsappNumber: regularUser.whatsappNumber,
         website: regularUser.website,
+        panNumber: regularUser.panNumber,
+        panCardImage: regularUser.panCardImage,
+        gstCertificate: regularUser.gstCertificate,
+        isPhoneVerified: regularUser.isPhoneVerified,
+        isVerified: regularUser.isVerified,
       };
 
     return res.json({
@@ -517,7 +526,7 @@ exports.createVendorProfile = async (req, res) => {
 
     if (user.userType && user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID,panNumber } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID, panNumber } = req.body;
 
     if (!companyName) return res.status(400).json({ success: false, message: 'Company name is required' });
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
@@ -546,14 +555,19 @@ exports.createVendorProfile = async (req, res) => {
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
     if (website) user.website = website.trim();
-    if(panNumber) user.panNumber=panNumber;
+    if (panNumber) user.panNumber = panNumber;
     user.userType = 'vendor';
     user.isProfileCreated = true;
 
     if (req.files) {
       if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
       if (req.files.companyLogo) user.companyLogo = req.files.companyLogo[0].path;
+      if (req.files.panCardImage) user.panCardImage = req.files.panCardImage[0].path;
+      if (req.files.gstCertificate) user.gstCertificate = req.files.gstCertificate[0].path;
     }
+
+    if (!user.panCardImage) return res.status(400).json({ success: false, message: 'PanCard image is required' });
+    if (!user.gstCertificate) return res.status(400).json({ success: false, message: 'GST Certificate image is required' });
 
     await user.save();
     const savedUser = await User.findById(user._id);
@@ -561,7 +575,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website,panNumber:savedUser.panNumber, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, panNumber: savedUser.panNumber, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -575,7 +589,7 @@ exports.editVendorProfile = async (req, res) => {
 
     if (!user || user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID,panNumber } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID, panNumber } = req.body;
 
     if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
       return res.status(400).json({
@@ -598,16 +612,17 @@ exports.editVendorProfile = async (req, res) => {
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
     if (website) user.website = website.trim();
-    if(panNumber) user.panNumber=panNumber;
+    if (panNumber) user.panNumber = panNumber;
 
     if (req.files) {
-      if (req.files.profileImage) {
-        user.profileImage = req.files.profileImage[0].path;
-      }
-      if (req.files.companyLogo) {
-        user.companyLogo = req.files.companyLogo[0].path;
-      }
+      if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
+      if (req.files.companyLogo) user.companyLogo = req.files.companyLogo[0].path;
+      if (req.files.panCardImage) user.panCardImage = req.files.panCardImage[0].path;
+      if (req.files.gstCertificate) user.gstCertificate = req.files.gstCertificate[0].path;
     }
+
+    if (!user.panCardImage) return res.status(400).json({ success: false, message: 'PanCard image is required' });
+    if (!user.gstCertificate) return res.status(400).json({ success: false, message: 'GST Certificate image is required' });
 
     await user.save();
     const savedUser = await User.findById(req.user.id);
@@ -615,7 +630,7 @@ exports.editVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber,panNumber:savedUser.panNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

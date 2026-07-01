@@ -95,6 +95,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  gstCertificate: {
+    type: String,
+    default: null,
+  },
+  panCardImage: {
+    type: String,
+    default: null,
+  },
   companyName: {
     type: String,
     trim: true,

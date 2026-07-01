@@ -114,34 +114,6 @@ exports.applyToJob = async (req, res) => {
     }
 
     const applicantId = req.user.id;
-    const { coverLetter, experience } = req.body;
-
-    if (isNaN(experience)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Experience value.Experience must be a number'
-      });
-    }
-
-
-    const exp = Number(experience);
-    if (exp < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Experience must be a non-negative number'
-      });
-    }
-
-
-    if (
-      coverLetter &&
-      coverLetter.length > 1000
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cover letter must be less than 1000 characters'
-      });
-    }
 
     // Check if job exists
     const job = await Job.findById(jobId);
@@ -199,8 +171,6 @@ exports.applyToJob = async (req, res) => {
     const application = await Application.create({
       job: jobId,
       applicant: applicantId,
-      coverLetter: coverLetter?.trim(),
-      experience: exp,
     });
 
     const count = await Application.countDocuments({

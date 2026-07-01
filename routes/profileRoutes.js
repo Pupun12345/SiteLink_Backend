@@ -32,6 +32,8 @@ const workerUpload = upload.fields([
 const vendorUpload = upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'companyLogo', maxCount: 1 },
+  { name: 'gstCertificate', maxCount: 1 },
+  { name: 'panCardImage', maxCount: 1 },
 ]);
 
 router.get('/me', protect, getProfile);
