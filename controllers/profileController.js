@@ -438,7 +438,7 @@ exports.editWorkerProfile = async (req, res) => {
 
       const uniqueSecondaryIds = [...new Set(
         filteredSecondaryIds.filter(
-          id => parseInt(id) !== parsedPrimarySkillId
+          id => parseInt(id) !== parsedPrimaryId
         )
       )];
 

@@ -9,8 +9,6 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    unique: true,
-    sparse: true,
     trim: true,
     match: [
       /^[6-9]\d{9}$/,
@@ -149,7 +147,9 @@ const userSchema = new mongoose.Schema({
   // Google / Social Auth
   firebaseUid: {
     type: String,
-    default: null,
+    unique: true,
+    sparse: true,
+    default: undefined,
   },
   authProvider: {
     type: String,

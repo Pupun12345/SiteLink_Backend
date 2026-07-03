@@ -20,8 +20,6 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const legalRoutes = require('./routes/legalRoutes');
 // const platformSettingRoutes = require('./routes/platformSettingRoutes');
 
-connectDB();
-
 // API Request Tracking Middleware
 app.use(trackApiRequest)
 app.use('/api', trackApiRequest);
@@ -50,6 +48,8 @@ app.use('/api/legal', legalRoutes);
 // app.use('/api/system', systemRoutes);
 app.use('/api/notifications', notificationRoutes);
 // app.use('/api/platform-settings', platformSettingRoutes);
+
+
 
 // Test auth page
 app.get('/test-auth', (req, res) => {
@@ -98,10 +98,12 @@ app.get('/test-auth', (req, res) => {
 });
 
 
-// Start server
+// Start server only after DB is connected and indexes are fixed
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 });
 
 
