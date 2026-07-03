@@ -22,7 +22,10 @@ exports.register = async (req, res) => {
 
     const { phone } = req.body;
 
-    const otp = generateOTP();
+    const otp =
+      process.env.NODE_ENV === "production"
+        ? generateOTP()
+        : "123456";
     const otpExpire = getOTPExpiry();
 
     const existingUser = await User.findOne({ phone });
@@ -71,9 +74,9 @@ exports.verifyOtp = async (req, res, next) => {
     const { phone, otp } = req.body;
 
     //User Exists or not
-    const userExist = await User.findOne({ phone,isPhoneVerified:true });
+    const userExist = await User.findOne({ phone, isPhoneVerified: true });
     if (userExist) {
-      return sendTokenResponse(userExist, 200, res,true);
+      return sendTokenResponse(userExist, 200, res, true);
     }
 
     // Validate phone & OTP
