@@ -14,6 +14,7 @@ const {
   getStates,
   getCitiesByState,
   getSkills,
+  languages
 } = require('../controllers/profileController');
 
 const router = express.Router();
@@ -41,8 +42,11 @@ router.get('/me', protect, getProfile);
 // States & Cities (public)
 router.get('/states', getStates);
 router.get('/cities/:stateId', getCitiesByState);
-// router.post('/location/:stateId/:cityId', protect, getLocationByIds);
 
+//Language Route
+router.post('/language', protect, languages);
+
+//Skills Route
 router.get('/skills', protect, getSkills);
 
 // Create profile

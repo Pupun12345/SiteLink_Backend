@@ -161,6 +161,10 @@ const userSchema = new mongoose.Schema({
   fcmToken: { type: String, default: null },
 
   // Common fields
+  language: {
+    type: String,
+    default: 'english'
+  },
   isPhoneVerified: {
     type: Boolean,
     default: false,
