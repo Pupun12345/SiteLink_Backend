@@ -10,26 +10,26 @@ exports.getCommunityFeed = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
     const skip = (page - 1) * limit;
 
-    const filter = { isActive: true, approvalStatus: 'approved' };
+    const filter = {
+      isActive: true,
+      approvalStatus: "approved",
+    };
 
-    const [posts, jobs] = await Promise.all([
+    const [posts, total] = await Promise.all([
       Post.find(filter)
-        .populate('postedBy', 'name profileImage')
-        .populate('likes.userId', 'name')
+        .populate("postedBy", "name profileImage")
+        .populate("likes.userId", "name")
         .sort({ createdAt: -1 })
-        .lean(),
-      Job.find(filter)
-        .populate('postedBy', 'name profileImage companyName')
-        .populate('likes.userId', 'name')
-        .sort({ createdAt: -1 })
-        .lean(),
+        .skip(skip)
+        .limit(limit),
+
+      Post.countDocuments(filter),
     ]);
 
-    const formattedPosts = posts.map(post => ({
-      type: 'post',
+    const formattedPosts = posts.map((post) => ({
+      type: "post",
       _id: post._id,
       content: post.content,
       images: post.images,
@@ -43,48 +43,15 @@ exports.getCommunityFeed = async (req, res) => {
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
       createdAt: post.createdAt,
-      likes: (post.likes || []).map(like => ({
+      likes: (post.likes || []).map((like) => ({
         userId: like.userId?._id,
         userName: like.userId?.name,
       })),
     }));
-
-    const formattedJobs = jobs.map(job => ({
-      type: 'job',
-      _id: job._id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      salary: job.salary,
-      salaryType: job.salaryType,
-      isUrgent: job.isUrgent,
-      duration: job.duration || null,
-      description: job.description,
-      experience: job.experience,
-      workersNeeded: job.quantity,
-      applicationsCount: job.applicationsCount,
-      posterName: job.postedBy?.name || null,
-      posterImage: job.postedBy?.profileImage || null,
-      companyName: job.postedBy?.companyName || job.company,
-      postedBy: job.postedBy?._id,
-      likesCount: job.likesCount,
-      commentsCount: job.commentsCount,
-      createdAt: job.createdAt,
-      likes: (job.likes || []).map(like => ({
-        userId: like.userId?._id,
-        userName: like.userId?.name,
-      })),
-    }));
-
-    const items = [...formattedPosts, ...formattedJobs]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    const total = items.length;
-    const paginated = items.slice(skip, skip + limit);
 
     res.status(200).json({
       success: true,
-      data: paginated,
+      data: formattedPosts,
       pagination: {
         current: page,
         limit,
@@ -95,7 +62,7 @@ exports.getCommunityFeed = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching community feed',
+      message: "Error fetching community feed",
       error: error.message,
     });
   }
@@ -131,7 +98,9 @@ exports.createPost = async (req, res) => {
       companyName: user.companyName || user.ownerName || null,
       images,
       video,
-      verification: user.verificationStatus || 'unverified',
+      verification: user.verificationStatus || "unverified",
+      approvalStatus: "approved",
+      approvedAt: new Date(),
     };
 
     const post = await Post.create(postData);
@@ -158,6 +127,8 @@ exports.createPost = async (req, res) => {
         commentsCount: populatedPost.commentsCount,
         createdAt: populatedPost.createdAt,
         likes: populatedPost.likes,
+        approvalStatus: populatedPost.approvalStatus,
+        approvedAt: populatedPost.approvedAt
       },
     });
   } catch (error) {
