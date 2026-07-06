@@ -6,7 +6,6 @@ const legalPolicySchema = new mongoose.Schema(
       type: String,
       enum: ['PRIVACY_POLICY', 'TERMS_AND_CONDITIONS'],
       required: true,
-      unique: true,
       index: true,
     },
     title: {
@@ -29,13 +28,11 @@ const legalPolicySchema = new mongoose.Schema(
     },
     effectiveDate: {
       type: Date,
-      required: true,
       default: Date.now,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
     },
     lastUpdatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -65,4 +62,5 @@ legalPolicySchema.virtual('urlSlug').get(function () {
   return this.policyType.toLowerCase().replace(/_/g, '-');
 });
 
-module.exports = mongoose.model('LegalPolicy', legalPolicySchema);
+module.exports = mongoose.model('LegalPolicies', legalPolicySchema);
+

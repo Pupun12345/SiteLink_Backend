@@ -9,16 +9,8 @@ const errorHandler = require('./middleware/errorHandler');
 const communityRoutes = require('./routes/communityRoutes');
 const { trackApiRequest } = require('./middleware/apiTracker');
 const jobRoutes = require('./routes/jobRoutes');
-// const skillsRoutes = require('./routes/skillsRoutes');
-// const statsRoutes = require('./routes/statsRoutes');
-// const searchRoutes = require('./routes/searchRoutes');
-// const adminRoutes = require('./routes/adminRoutes');
-// const adminUserRoutes = require('./routes/adminUserRoutes');
-// const workerHomeRoutes = require('./routes/workerHomePage');
-// const systemRoutes = require('./routes/systemRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const legalRoutes = require('./routes/legalRoutes');
-// const platformSettingRoutes = require('./routes/platformSettingRoutes');
 
 // API Request Tracking Middleware
 app.use(trackApiRequest)
@@ -38,16 +30,8 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/community', communityRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/legal', legalRoutes);
-// app.use('/api/help-support', require('./routes/helpSupportRoutes'));
-// app.use('/api/stats', statsRoutes);
-// app.use('/api/admin-users', adminUserRoutes);
-// app.use('/api/search', searchRoutes);
-// app.use('/api/skills', skillsRoutes);
-// app.use('/api/admin', adminRoutes);
-// app.use('/api/worker', workerHomeRoutes);
-// app.use('/api/system', systemRoutes);
 app.use('/api/notifications', notificationRoutes);
-// app.use('/api/platform-settings', platformSettingRoutes);
+app.use('/api/plans', require('./routes/planRoutes'));
 
 
 

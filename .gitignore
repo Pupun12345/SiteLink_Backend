@@ -4,3 +4,7 @@ uploads
 *.html
 *.md
 firebase-messaging-sw.js
+removeIndex.js
+seedDemoJobs.js
+seedJobs.js
+seedlegalPolicies.js

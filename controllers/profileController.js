@@ -183,6 +183,7 @@ exports.getProfile = async (req, res) => {
         workSamplesPhoto: regularUser.workSamplesPhoto,
         isPhoneVerified: regularUser.isPhoneVerified,
         isVerified: regularUser.isVerified,
+        subscription: regularUser.subscription
       }
       : {
         id: regularUser._id,
@@ -207,6 +208,7 @@ exports.getProfile = async (req, res) => {
         gstCertificate: regularUser.gstCertificate,
         isPhoneVerified: regularUser.isPhoneVerified,
         isVerified: regularUser.isVerified,
+        subscription: regularUser.subscription
       };
 
     return res.json({
@@ -406,7 +408,7 @@ exports.createWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile created successfully',
-      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, workCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, governmentID: user.governmentID, workSamplesPhoto: user.workSamplesPhoto, experienceCertificate: user.experienceCertificate, language: user.language, isVerified: user.isVerified, verificationStatus: user.verificationStatus, isProfileCreated: user.isProfileCreated }
+      user: { id: user._id, name: user.name, phone: user.phone, userType: user.userType, role: user.role, profileImage: user.profileImage, workCity: user.city, primarySkill: user.primarySkill, additionalSkills: user.skills, totalExperience: user.experience, workState: user.workState, willingtoRelocate: user.willingtoRelocate, salaryType: user.salaryType, salary: user.salary, governmentID: user.governmentID, workSamplesPhoto: user.workSamplesPhoto, experienceCertificate: user.experienceCertificate, language: user.language, isVerified: user.isVerified, verificationStatus: user.verificationStatus, isProfileCreated: user.isProfileCreated, subscription: user.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -570,7 +572,7 @@ exports.editWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, governmentID: savedUser.governmentID, workSamplesPhoto: savedUser.workSamplesPhoto, experienceCertificate: savedUser.experienceCertificate,language: user.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, governmentID: savedUser.governmentID, workSamplesPhoto: savedUser.workSamplesPhoto, experienceCertificate: savedUser.experienceCertificate,language: user.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -636,7 +638,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, panNumber: savedUser.panNumber, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, panNumber: savedUser.panNumber, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -691,7 +693,7 @@ exports.editVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
