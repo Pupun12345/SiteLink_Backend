@@ -5,6 +5,10 @@ const planDetails = require('../models/PlanDetails');
 exports.getPlans = async (req, res) => {
     try {
         let plans = await planDetails.find().sort({ createdAt: 1 });
+        const userType = req.user.userType;
+        if (userType) {
+            plans = plans.filter(plan => plan.userType === userType);
+        }
         if(!plans){
             return res.status(404).json({
                 success:false,
