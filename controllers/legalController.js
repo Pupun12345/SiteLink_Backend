@@ -1,7 +1,7 @@
 const LegalPolicy =require('../models/LegalPolicy')
 
 
-// Get all policies — all versions of both types (Admin)
+// Get all policies — all versions of all types (Admin)
 exports.getAllPolicies = async (req, res) => {
   try {
     const policies = await LegalPolicy.find({isActive: true})
