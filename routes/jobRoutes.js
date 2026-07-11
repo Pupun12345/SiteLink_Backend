@@ -12,6 +12,8 @@ const {
   deleteJobComment,
   getJobComments,
   deleteJob,
+  getJobApplicants,
+  updateApplicantStatus,
 } = require('../controllers/jobsController');
 const { protect,applicable } = require('../middleware/auth');
 
@@ -25,6 +27,12 @@ router.get('/:id', getJobDetailsById);
 
 // POST apply to job (protected)
 router.post('/:id/apply', protect,applicable, applyToJob);
+
+// GET applicants for a job (job owner / admin)
+router.get('/:id/applicants', protect, getJobApplicants);
+
+// PUT update an applicant's status (job owner / admin)
+router.put('/:id/applicants/:applicationId/status', protect, updateApplicantStatus);
 
 // POST create job (protected)
 router.post('/', protect, createJob);

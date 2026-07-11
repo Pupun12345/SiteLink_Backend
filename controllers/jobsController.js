@@ -84,6 +84,7 @@ exports.getJobs = async (req, res) => {
       salaryType: job.salaryType,
       isUrgent: job.isUrgent,
       amenities: job.amenities,
+      applicationsCount: job.applicationsCount || 0,
       postedAt: job.createdAt,
       postedBy: {
         id: job.postedBy?._id,
@@ -221,7 +222,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -652,7 +653,114 @@ exports.deleteJob = async (req, res) => {
   }
 };
 
+// Helper: shape an Application's populated applicant into the `worker` object the app expects.
+function _formatApplicant(application) {
+  const w = application.applicant || {};
+  return {
+    _id: application._id,
+    worker: {
+      _id: w._id,
+      name: w.name,
+      profileImage: w.profileImage || null,
+      primarySkill: w.primarySkill || null,
+      skills: w.skills || [],
+      totalExperience: w.experience || null,
+      phone: w.phone || null,
+      workCity: w.city || null,
+      workState: w.workState || null,
+      isVerified: w.isVerified === true,
+      rating: w.adminRating != null ? w.adminRating : null,
+    },
+    coverLetter: application.coverLetter || null,
+    experience: w.experience || null,
+    status: application.status,
+    createdAt: application.createdAt,
+  };
+}
 
+// @desc    Get all applicants for a job (job owner / admin only)
+// @route   GET /api/jobs/:id/applicants
+// @access  Private
+exports.getJobApplicants = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Job ID' });
+    }
+
+    const job = await Job.findById(id).select('postedBy');
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    const isOwner = job.postedBy?.toString() === req.user.id;
+    const isAdmin = req.user.userType === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view applicants for this job' });
+    }
+
+    const applications = await Application.find({ job: id })
+      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = applications.map(_formatApplicant);
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update an applicant's status (job owner / admin only)
+// @route   PUT /api/jobs/:id/applicants/:applicationId/status
+// @access  Private
+exports.updateApplicantStatus = async (req, res) => {
+  try {
+    const { id, applicationId } = req.params;
+    const { status } = req.body;
+
+    const allowed = ['pending', 'shortlisted', 'confirmed', 'rejected', 'hired'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(applicationId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Job ID or Application ID' });
+    }
+
+    const job = await Job.findById(id).select('postedBy');
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    const isOwner = job.postedBy?.toString() === req.user.id;
+    const isAdmin = req.user.userType === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this application' });
+    }
+
+    const application = await Application.findOne({ _id: applicationId, job: id });
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found for this job' });
+    }
+
+    application.status = status;
+    await application.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Applicant ${status} successfully`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 exports.fetchAllAmenities = async (req, res) => {
   try {
