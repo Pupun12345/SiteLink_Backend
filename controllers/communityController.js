@@ -1,7 +1,6 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
-const Job = require('../models/job');
 
 // @desc    Get community feed (posts + jobs merged)
 // @route   GET /api/community/feed
@@ -145,7 +144,7 @@ exports.likeUnlikePost = async (req, res) => {
     const { postId } = req.params;
     const userId = req.user._id;
 
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).select('likes');
 
     if (!post) {
       return res.status(404).json({
@@ -154,22 +153,14 @@ exports.likeUnlikePost = async (req, res) => {
       });
     }
 
-    const likeIndex = post.likes.findIndex(like => like.userId.toString() === userId.toString());
+    const alreadyLiked = post.likes.some(like => like.userId.toString() === userId.toString());
 
-    if (likeIndex > -1) {
-      // Unlike
-      post.likes.splice(likeIndex, 1);
-      post.likesCount = Math.max(0, post.likesCount - 1);
-    } else {
-      // Like
-      post.likes.push({
-        userId: userId,
-        likedAt: new Date(),
-      });
-      post.likesCount += 1;
-    }
-
-    await post.save();
+    await Post.updateOne(
+      { _id: postId },
+      alreadyLiked
+        ? { $pull: { likes: { userId } }, $inc: { likesCount: -1 } }
+        : { $push: { likes: { userId, likedAt: new Date() } }, $inc: { likesCount: 1 } }
+    );
 
     const updatedPost = await Post.findById(postId)
       .populate('postedBy', 'name profileImage')
@@ -177,10 +168,10 @@ exports.likeUnlikePost = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: likeIndex > -1 ? 'Post unliked' : 'Post liked',
+      message: alreadyLiked ? 'Post unliked' : 'Post liked',
       data: {
         _id: updatedPost._id,
-        likesCount: updatedPost.likesCount,
+        likesCount: Math.max(0, updatedPost.likesCount),
         likes: updatedPost.likes,
       },
     });
@@ -282,6 +273,8 @@ exports.addComment = async (req, res) => {
       comment: comment.trim(),
       parentComment
     });
+
+    await Post.updateOne({ _id: postId }, { $inc: { commentsCount: 1 } });
 
     await newComment.populate('userId', 'name profileImage userType verificationStatus');
 
@@ -416,7 +409,7 @@ exports.deleteComment = async (req, res) => {
       });
     }
 
-    if (comment.userId.toString() !== userId && req.user.role !== 'admin') {
+    if (comment.userId.toString() !== userId && req.user.userType !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this comment',
@@ -425,7 +418,7 @@ exports.deleteComment = async (req, res) => {
 
     comment.status = 'deleted';
     await comment.save();
-    // await Comment.deleteOne({ _id: commentId });
+    await Post.updateOne({ _id: postId }, { $inc: { commentsCount: -1 } });
 
     res.status(200).json({
       success: true,

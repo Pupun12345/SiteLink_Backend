@@ -5,16 +5,23 @@ const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
 const Amenity = require('../models/amenities');
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // @desc    Get all jobs
 // @route   GET /api/jobs
 // @access  Public
 exports.getJobs = async (req, res) => {
   try {
     const { location, search, salaryType, sort } = req.query;
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
+    const skip = (page - 1) * limit;
 
     let filter = { "approvalStatus": "approved" };
 
-    if (location) filter.location = { $regex: location, $options: 'i' };
+    if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
 
     if (salaryType) {
       const allowedTypes = [
@@ -37,10 +44,11 @@ exports.getJobs = async (req, res) => {
     }
 
     if (search) {
+      const safeSearch = escapeRegex(search);
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { company: { $regex: search, $options: 'i' } },
-        { location: { $regex: search, $options: 'i' } },
+        { title: { $regex: safeSearch, $options: 'i' } },
+        { company: { $regex: safeSearch, $options: 'i' } },
+        { location: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -52,42 +60,49 @@ exports.getJobs = async (req, res) => {
 
     const sortOrder = sortMap[sort] || { createdAt: -1 };
 
-    const jobs = await Job.find(filter)
-      .populate('postedBy', 'name companyName')
-      .populate("amenities", "id name category icon")
-      .sort(sortOrder)
-      .lean();
+    const [jobs, total] = await Promise.all([
+      Job.find(filter)
+        .populate('postedBy', 'name companyName')
+        .populate("amenities", "id name category icon")
+        .sort(sortOrder)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Job.countDocuments(filter),
+    ]);
 
-    const data = await Promise.all(
-      jobs.map(async (job) => {
-        return {
-          _id: job._id,
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          latitude: job.latitude,
-          longitude: job.longitude,
-          workersNeeded: job.quantity,
-          duration: job.duration || null,
-          salary: job.salary,
-          salaryType: job.salaryType,
-          isUrgent: job.isUrgent,
-          amenities: job.amenities,
-          postedAt: job.createdAt,
-          postedBy: {
-            id: job.postedBy?._id,
-            name: job.postedBy?.name,
-            designation: job.postedBy?.designation,
-            companyName: job.postedBy?.companyName
-          }
-        };
-      })
-    );
+    const data = jobs.map((job) => ({
+      _id: job._id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      workersNeeded: job.quantity,
+      duration: job.duration || null,
+      salary: job.salary,
+      salaryType: job.salaryType,
+      isUrgent: job.isUrgent,
+      amenities: job.amenities,
+      postedAt: job.createdAt,
+      postedBy: {
+        id: job.postedBy?._id,
+        name: job.postedBy?.name,
+        designation: job.postedBy?.designation,
+        companyName: job.postedBy?.companyName
+      }
+    }));
 
     res.status(200).json({
       success: true,
       count: data.length,
       data,
+      pagination: {
+        current: page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -173,11 +188,7 @@ exports.applyToJob = async (req, res) => {
       applicant: applicantId,
     });
 
-    const count = await Application.countDocuments({
-      job: jobId
-    });
-    job.applicationsCount = count;
-    await job.save();
+    await Job.updateOne({ _id: jobId }, { $inc: { applicationsCount: 1 } });
 
     await application.populate('applicant', 'name profileImage userType');
 
@@ -374,8 +385,8 @@ exports.createJob = async (req, res) => {
       title: title.trim(),
       company: company.trim(),
       location: location.trim(),
-      latitude: latitude.trim(),
-      longitude: longitude.trim(),
+      latitude: latitude ? latitude.trim() : null,
+      longitude: longitude ? longitude.trim() : null,
       quantity: workersNeeded,
       salary: parsedSalary,
       salaryType: salaryType,
@@ -413,27 +424,29 @@ exports.likeUnlikeJob = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const job = await Job.findById(id);
+    const job = await Job.findById(id).select('likes');
     if (!job) {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
 
-    const likeIndex = job.likes.findIndex(like => like.userId.toString() === userId.toString());
+    const alreadyLiked = job.likes.some(like => like.userId.toString() === userId.toString());
 
-    if (likeIndex > -1) {
-      job.likes.splice(likeIndex, 1);
-      job.likesCount = Math.max(0, job.likesCount - 1);
-    } else {
-      job.likes.push({ userId, likedAt: new Date() });
-      job.likesCount = (job.likesCount || 0) + 1;
-    }
-
-    await job.save();
+    const updatedJob = alreadyLiked
+      ? await Job.findByIdAndUpdate(
+          id,
+          { $pull: { likes: { userId } }, $inc: { likesCount: -1 } },
+          { new: true }
+        ).select('likesCount')
+      : await Job.findByIdAndUpdate(
+          id,
+          { $push: { likes: { userId, likedAt: new Date() } }, $inc: { likesCount: 1 } },
+          { new: true }
+        ).select('likesCount');
 
     res.status(200).json({
       success: true,
-      message: likeIndex > -1 ? 'Job unliked' : 'Job liked',
-      data: { _id: job._id, likesCount: job.likesCount },
+      message: alreadyLiked ? 'Job unliked' : 'Job liked',
+      data: { _id: updatedJob._id, likesCount: Math.max(0, updatedJob.likesCount) },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error liking/unliking job', error: error.message });
@@ -473,14 +486,13 @@ exports.addJobComment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Comment cannot exceed 500 characters' });
     }
 
-    const job = await Job.findById(id);
-    if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+    const jobExists = await Job.exists({ _id: id });
+    if (!jobExists) return res.status(404).json({ success: false, message: 'Job not found' });
 
     const commentData = { userId, comment: comment.trim(), parentComment, jobId: id };
     const newComment = await Comment.create(commentData);
     await newComment.populate('userId', 'name profileImage userType verificationStatus');
-    job.commentsCount = (job.commentsCount || 0) + 1;
-    await job.save();
+    await Job.updateOne({ _id: id }, { $inc: { commentsCount: 1 } });
 
     res.status(201).json({
       success: true,
@@ -548,12 +560,13 @@ exports.deleteJobComment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Comment not found' });
     }
 
-    if (comment.userId.toString() !== userId && req.user.role !== 'admin') {
+    if (comment.userId.toString() !== userId && req.user.userType !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' });
     }
 
     comment.status = 'deleted';
     await comment.save();
+    await Job.updateOne({ _id: jobId }, { $inc: { commentsCount: -1 } });
 
     res.status(200).json({ success: true, message: 'Comment deleted successfully' });
   } catch (error) {
@@ -643,7 +656,7 @@ exports.deleteJob = async (req, res) => {
 
 exports.fetchAllAmenities = async (req, res) => {
   try {
-    const data = await amenities.find().sort({ category: 1, id: 1 });
+    const data = await Amenity.find().sort({ category: 1, id: 1 });
     return res.status(200).json({
       success: true,
       data,
@@ -697,7 +710,7 @@ exports.getGroupedAmenities = async (req, res) => {
 
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await amenities.distinct("category");
+    const categories = await Amenity.distinct("category");
     return res.status(200).json({
       success: true,
       data: categories,
@@ -753,7 +766,7 @@ exports.addAmenities = async (req, res) => {
       });
     }
 
-    const existingAmenity = await amenities.findOne({ name });
+    const existingAmenity = await Amenity.findOne({ name });
 
     if (existingAmenity) {
       return res.status(400).json({
@@ -762,11 +775,11 @@ exports.addAmenities = async (req, res) => {
       });
     }
 
-    const lastAmenity = await amenities.findOne().sort({ id: -1 });
+    const lastAmenity = await Amenity.findOne().sort({ id: -1 });
 
     const nextId = lastAmenity ? lastAmenity.id + 1 : 1;
 
-    const amenity = await amenities.create({
+    const amenity = await Amenity.create({
       id: nextId,
       name,
       category,
@@ -821,7 +834,7 @@ exports.updateAmenity = async (req, res) => {
 
     // Prevent duplicate names
     if (name) {
-      const existingAmenity = await amenities.findOne({
+      const existingAmenity = await Amenity.findOne({
         name,
         _id: { $ne: id },
       });
@@ -834,7 +847,7 @@ exports.updateAmenity = async (req, res) => {
       }
     }
 
-    const amenity = await amenities.findByIdAndUpdate(
+    const amenity = await Amenity.findByIdAndUpdate(
       id,
       {
         ...(name && { name }),
@@ -896,7 +909,7 @@ exports.deleteAmenity = async (req, res) => {
       });
     }
 
-    const amenity = await amenities.findByIdAndDelete(id);
+    const amenity = await Amenity.findByIdAndDelete(id);
 
     if (!amenity) {
       return res.status(404).json({

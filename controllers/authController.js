@@ -1,9 +1,8 @@
 const User = require('../models/User');
-const { sendTokenResponse, generateToken } = require('../utils/tokenUtils');
+const { sendTokenResponse } = require('../utils/tokenUtils');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
-const crypto = require('crypto');
 const admin = require('../config/firebase');
 
 // @desc    Register user
@@ -28,6 +27,9 @@ exports.register = async (req, res) => {
         : "123456";
     const otpExpire = getOTPExpiry();
 
+    // TODO: integrate a real SMS provider and send `otp` there instead of exposing it here.
+    const isProduction = process.env.NODE_ENV === 'production';
+
     const existingUser = await User.findOne({ phone });
 
     if (existingUser) {
@@ -35,25 +37,25 @@ exports.register = async (req, res) => {
       existingUser.otpExpire = otpExpire;
       existingUser.otpAttempts = 0;
       await existingUser.save();
-      console.log(`OTP for +91${phone}: ${otp}`);
+      if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
       return res.status(200).json({
         success: true,
         message: 'OTP sent to +91' + phone,
-        data: { phone, otp, expiresIn: '10 minutes' },
+        data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
       });
     }
 
     const user = await User.create({ phone, otp, otpExpire, otpAttempts: 0, isPhoneVerified: false });
-    console.log(`OTP for +91${phone}: ${otp}`);
+    if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
     res.status(200).json({
       success: true,
       message: 'Registration successful. OTP sent to +91' + phone,
       data: {
         phone: user.phone,
-        otp: otp,
         expiresIn: '10 minutes',
+        ...(isProduction ? {} : { otp }),
       },
     });
   } catch (error) {
@@ -73,12 +75,6 @@ exports.verifyOtp = async (req, res, next) => {
   try {
     const { phone, otp } = req.body;
 
-    //User Exists or not
-    const userExist = await User.findOne({ phone, isPhoneVerified: true });
-    if (userExist) {
-      return sendTokenResponse(userExist, 200, res, true);
-    }
-
     // Validate phone & OTP
     if (!phone || !otp) {
       return res.status(400).json({
@@ -86,7 +82,6 @@ exports.verifyOtp = async (req, res, next) => {
         message: 'Please provide phone number and OTP',
       });
     }
-
 
     // Find user with OTP and phone
     const user = await User.findOne({ phone }).select('+otp +otpExpire +otpAttempts');
@@ -97,6 +92,8 @@ exports.verifyOtp = async (req, res, next) => {
         message: 'User not found',
       });
     }
+
+    const wasAlreadyVerified = user.isPhoneVerified;
 
     // Check if OTP matches
     if (user.otp !== otp) {
@@ -125,7 +122,7 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     // Check if OTP has expired
-    if (user.otpExpire < Date.now()) {
+    if (!user.otpExpire || user.otpExpire < Date.now()) {
       return res.status(400).json({
         success: false,
         message: 'OTP has expired. Please request a new one.',
@@ -139,7 +136,7 @@ exports.verifyOtp = async (req, res, next) => {
     user.otpAttempts = 0;
     await user.save();
 
-    sendTokenResponse(user, 200, res);
+    sendTokenResponse(user, 200, res, wasAlreadyVerified);
   } catch (error) {
     next(error);
   }
@@ -155,8 +152,6 @@ exports.googleAuthLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Request body is missing. Send JSON with Content-Type: application/json' });
     }
     const { firebaseIdToken, deviceToken, deviceType } = req.body;
-    console.log('Received token length:', firebaseIdToken?.length);
-    console.log('Token preview:', firebaseIdToken?.substring(0, 50));
 
     if (!firebaseIdToken) {
       return res.status(400).json({ success: false, message: 'Firebase ID token is required' });

@@ -1,7 +1,5 @@
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
 const Skill = require('../models/Skill');
-const { verify } = require('crypto');
 const Post = require('../models/Post');
 
 const STATES = [
