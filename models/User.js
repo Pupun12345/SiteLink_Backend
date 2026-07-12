@@ -165,6 +165,7 @@ const userSchema = new mongoose.Schema({
   // Common fields
   language: {
     type: String,
+    enum: ['hindi', 'english'],
     default: 'english'
   },
   isPhoneVerified: {

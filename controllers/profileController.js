@@ -123,9 +123,18 @@ exports.languages = async (req, res) => {
       });
     }
 
+    const allowed = ['hindi', 'english'];
+    const normalized = String(language).toLowerCase();
+    if (!allowed.includes(normalized)) {
+      return res.status(400).json({
+        success: false,
+        message: "Language must be one of: hindi, english",
+      });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { language },
+      { language: normalized },
       { new: true }
     );
 
@@ -139,7 +148,7 @@ exports.languages = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Language updated successfully",
-      data: user,
+      data: { language: user.language },
     });
   } catch (error) {
     return res.status(500).json({
@@ -181,6 +190,8 @@ exports.getProfile = async (req, res) => {
         workSamplesPhoto: regularUser.workSamplesPhoto,
         isPhoneVerified: regularUser.isPhoneVerified,
         isVerified: regularUser.isVerified,
+        language: regularUser.language,
+        verificationStatus: regularUser.verificationStatus,
         subscription: regularUser.subscription
       }
       : {
@@ -206,6 +217,8 @@ exports.getProfile = async (req, res) => {
         gstCertificate: regularUser.gstCertificate,
         isPhoneVerified: regularUser.isPhoneVerified,
         isVerified: regularUser.isVerified,
+        language: regularUser.language,
+        verificationStatus: regularUser.verificationStatus,
         subscription: regularUser.subscription
       };
 
