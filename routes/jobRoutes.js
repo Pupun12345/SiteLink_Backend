@@ -17,6 +17,7 @@ const {
   getPendingJobs,
   approveJob,
   rejectJob,
+  getMyJobs,
 } = require('../controllers/jobsController');
 const { protect, applicable, requireAdmin } = require('../middleware/auth');
 
@@ -24,6 +25,9 @@ const { protect, applicable, requireAdmin } = require('../middleware/auth');
 router.get('/', getJobs);
 
 router.get("/getAppliedJobs", protect, appliedJobs);
+
+// GET jobs posted by the current user, any approvalStatus — must come before '/:id'
+router.get('/my', protect, getMyJobs);
 
 // GET jobs awaiting approval (admin only) — must come before '/:id'
 router.get('/admin/pending', protect, requireAdmin, getPendingJobs);

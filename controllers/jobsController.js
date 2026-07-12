@@ -9,6 +9,34 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Helper: shape a Job document into the summary object used by list endpoints.
+function _formatJobSummary(job) {
+  return {
+    _id: job._id,
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    latitude: job.latitude,
+    longitude: job.longitude,
+    workersNeeded: job.quantity,
+    duration: job.duration || null,
+    salary: job.salary,
+    salaryType: job.salaryType,
+    isUrgent: job.isUrgent,
+    amenities: job.amenities,
+    applicationsCount: job.applicationsCount || 0,
+    status: job.status,
+    approvalStatus: job.approvalStatus,
+    postedAt: job.createdAt,
+    postedBy: {
+      id: job.postedBy?._id,
+      name: job.postedBy?.name,
+      designation: job.postedBy?.designation,
+      companyName: job.postedBy?.companyName
+    }
+  };
+}
+
 // @desc    Get all jobs
 // @route   GET /api/jobs
 // @access  Public
@@ -71,30 +99,7 @@ exports.getJobs = async (req, res) => {
       Job.countDocuments(filter),
     ]);
 
-    const data = jobs.map((job) => ({
-      _id: job._id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      latitude: job.latitude,
-      longitude: job.longitude,
-      workersNeeded: job.quantity,
-      duration: job.duration || null,
-      salary: job.salary,
-      salaryType: job.salaryType,
-      isUrgent: job.isUrgent,
-      amenities: job.amenities,
-      applicationsCount: job.applicationsCount || 0,
-      status: job.status,
-      approvalStatus: job.approvalStatus,
-      postedAt: job.createdAt,
-      postedBy: {
-        id: job.postedBy?._id,
-        name: job.postedBy?.name,
-        designation: job.postedBy?.designation,
-        companyName: job.postedBy?.companyName
-      }
-    }));
+    const data = jobs.map(_formatJobSummary);
 
     res.status(200).json({
       success: true,
@@ -116,6 +121,35 @@ exports.getJobs = async (req, res) => {
   }
 };
 
+// @desc    Get jobs posted by the current user (any approvalStatus — pending/approved/rejected)
+// @route   GET /api/jobs/my
+// @access  Private
+exports.getMyJobs = async (req, res) => {
+  try {
+    const jobs = await Job.find({ postedBy: req.user.id })
+      .populate('postedBy', 'name companyName')
+      .populate('amenities', 'id name category icon')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = jobs.map((job) => ({
+      ..._formatJobSummary(job),
+      rejectionReason: job.rejectionReason || null,
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch your jobs',
+      error: error.message,
+    });
+  }
+};
 
 // @desc    Apply to a job
 // @route   POST /api/jobs/:id/apply
