@@ -266,3 +266,165 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
+// @desc    Register a vendor (phone + email + password, no OTP)
+// @route   POST /api/auth/vendor/register
+// @access  Public
+exports.vendorRegister = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { name, phone, email, password } = req.body;
+
+    if (!phone || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone, email and password are required',
+      });
+    }
+
+    // Reject if phone or email already in use
+    const existing = await User.findOne({ $or: [{ phone }, { email: email.toLowerCase() }] });
+    if (existing) {
+      const field = existing.phone === phone ? 'phone number' : 'email';
+      return res.status(400).json({
+        success: false,
+        message: `This ${field} is already registered`,
+      });
+    }
+
+    const user = await User.create({
+      name: name || null,
+      phone,
+      email: email.toLowerCase(),
+      password,               // hashed by pre-save hook
+      userType: 'vendor',
+      authProvider: 'phone',
+      isPhoneVerified: false,
+      isVerified: false,
+      verificationStatus: 'pending',
+    });
+
+    // Auto-login after registration. Vendor is 'pending' until an admin verifies.
+    sendTokenResponse(user, 201, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Vendor login with phone/email + password
+// @route   POST /api/auth/vendor/login
+// @access  Public
+exports.vendorLogin = async (req, res, next) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    if ((!email && !phone) || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email or phone, and password',
+      });
+    }
+
+    const query = email ? { email: email.toLowerCase() } : { phone };
+    const user = await User.findOne(query).select('+password');
+
+    // Same generic message whether the account is missing or the password is wrong
+    if (!user || !user.password) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (user.userType !== 'vendor') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is not a vendor account. Please use the correct login.',
+      });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    sendTokenResponse(user, 200, res, true);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    List vendors awaiting verification
+// @route   GET /api/auth/admin/vendors/pending
+// @access  Private (admin only)
+exports.getPendingVendors = async (req, res, next) => {
+  try {
+    const vendors = await User.find({ userType: 'vendor', verificationStatus: 'pending' })
+      .select('name phone email companyName gstNumber panNumber city workState createdAt verificationStatus isVerified')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: vendors.length, data: vendors });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify (approve) a vendor
+// @route   PUT /api/auth/admin/vendors/:id/verify
+// @access  Private (admin only)
+exports.verifyVendor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.userType !== 'vendor') {
+      return res.status(400).json({ success: false, message: 'This user is not a vendor' });
+    }
+
+    user.isVerified = true;
+    user.verificationStatus = 'verified';
+    user.verificationReviewedAt = new Date();
+    user.verificationRejectedReason = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor verified successfully',
+      data: { id: user._id, verificationStatus: user.verificationStatus, isVerified: user.isVerified },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reject a vendor's verification
+// @route   PUT /api/auth/admin/vendors/:id/reject
+// @access  Private (admin only)
+exports.rejectVendor = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.userType !== 'vendor') {
+      return res.status(400).json({ success: false, message: 'This user is not a vendor' });
+    }
+
+    user.isVerified = false;
+    user.verificationStatus = 'rejected';
+    user.verificationReviewedAt = new Date();
+    user.verificationRejectedReason = reason || null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor verification rejected',
+      data: { id: user._id, verificationStatus: user.verificationStatus, verificationRejectedReason: user.verificationRejectedReason },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

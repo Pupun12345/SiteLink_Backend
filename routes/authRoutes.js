@@ -6,8 +6,13 @@ const {
   logout,
   getMe,
   googleAuthLogin,
+  vendorRegister,
+  vendorLogin,
+  getPendingVendors,
+  verifyVendor,
+  rejectVendor,
 } = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
+const { protect, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -19,12 +24,27 @@ const otpValidation = body('otp')
   .isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
   .isNumeric().withMessage('OTP must contain only numbers');
 
-// Public routes
+const emailValidation = body('email')
+  .isEmail().withMessage('Please provide a valid email');
+
+const passwordValidation = body('password')
+  .isLength({ min: 8 }).withMessage('Password must be at least 8 characters');
+
+// ---- Worker / customer: phone + OTP ----
 router.post('/register', [phoneValidation], register);
 router.post('/verify-otp', [phoneValidation, otpValidation], verifyOtp);
 router.post('/google-login', googleAuthLogin);
 
-// Private routes
+// ---- Vendor: phone + email + password (no OTP) ----
+router.post('/vendor/register', [phoneValidation, emailValidation, passwordValidation], vendorRegister);
+router.post('/vendor/login', vendorLogin);
+
+// ---- Admin: vendor verification management ----
+router.get('/admin/vendors/pending', protect, requireAdmin, getPendingVendors);
+router.put('/admin/vendors/:id/verify', protect, requireAdmin, verifyVendor);
+router.put('/admin/vendors/:id/reject', protect, requireAdmin, rejectVendor);
+
+// ---- Common private routes ----
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 

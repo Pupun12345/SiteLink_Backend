@@ -18,6 +18,9 @@ const sendTokenResponse = (user, statusCode, res,isExists=false) => {
     name: user.name,
     email: user.email,
     profileImage: user.profileImage,
+    isProfileCreated: user.isProfileCreated,
+    isVerified: user.isVerified,
+    verificationStatus: user.verificationStatus,
   };
 
   // Add worker-specific fields if profile already created
