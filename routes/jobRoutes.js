@@ -14,13 +14,19 @@ const {
   deleteJob,
   getJobApplicants,
   updateApplicantStatus,
+  getPendingJobs,
+  approveJob,
+  rejectJob,
 } = require('../controllers/jobsController');
-const { protect,applicable } = require('../middleware/auth');
+const { protect, applicable, requireAdmin } = require('../middleware/auth');
 
 // GET all jobs
 router.get('/', getJobs);
 
 router.get("/getAppliedJobs", protect, appliedJobs);
+
+// GET jobs awaiting approval (admin only) — must come before '/:id'
+router.get('/admin/pending', protect, requireAdmin, getPendingJobs);
 
 // GET single job
 router.get('/:id', getJobDetailsById);
@@ -36,6 +42,10 @@ router.put('/:id/applicants/:applicationId/status', protect, updateApplicantStat
 
 // POST create job (protected)
 router.post('/', protect, createJob);
+
+// Approve / reject a pending job (admin only)
+router.put('/:id/approve', protect, requireAdmin, approveJob);
+router.put('/:id/reject', protect, requireAdmin, rejectJob);
 
 // Like/Unlike a job
 router.put('/:id/like', protect, likeUnlikeJob);

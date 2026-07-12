@@ -384,6 +384,9 @@ exports.createJob = async (req, res) => {
       });
     }
 
+    // Admin-posted jobs go live immediately; vendor-posted jobs need admin approval.
+    const isAdminPoster = user.userType === 'admin';
+
     const job = await Job.create({
       title: title.trim(),
       company: company.trim(),
@@ -400,14 +403,17 @@ exports.createJob = async (req, res) => {
       experience: exp,
       postedBy: req.user.id,
       isActive: true,
-      approvalStatus: 'approved',
-      autoApproved: true,
-      approvedAt: new Date(),
+      approvalStatus: isAdminPoster ? 'approved' : 'pending',
+      autoApproved: isAdminPoster,
+      approvedBy: isAdminPoster ? req.user.id : null,
+      approvedAt: isAdminPoster ? new Date() : null,
     });
 
     res.status(201).json({
       success: true,
-      message: 'Job created and published successfully',
+      message: isAdminPoster
+        ? 'Job created and published successfully'
+        : 'Job submitted successfully. It will be visible once approved by an admin.',
       data: job,
     });
   } catch (error) {
@@ -652,6 +658,92 @@ exports.deleteJob = async (req, res) => {
     res.status(200).json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete job', error: error.message });
+  }
+};
+
+// @desc    List jobs awaiting admin approval
+// @route   GET /api/jobs/admin/pending
+// @access  Private (admin only)
+exports.getPendingJobs = async (req, res) => {
+  try {
+    const jobs = await Job.find({ approvalStatus: 'pending' })
+      .populate('postedBy', 'name companyName phone email userType')
+      .populate('amenities', 'id name category icon')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: jobs.length,
+      data: jobs,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch pending jobs', error: error.message });
+  }
+};
+
+// @desc    Approve a pending job
+// @route   PUT /api/jobs/:id/approve
+// @access  Private (admin only)
+exports.approveJob = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Job ID' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    job.approvalStatus = 'approved';
+    job.approvedBy = req.user.id;
+    job.approvedAt = new Date();
+    job.rejectionReason = null;
+    await job.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Job approved successfully',
+      data: job,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to approve job', error: error.message });
+  }
+};
+
+// @desc    Reject a pending job
+// @route   PUT /api/jobs/:id/reject
+// @access  Private (admin only)
+exports.rejectJob = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Job ID' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    job.approvalStatus = 'rejected';
+    job.approvedBy = req.user.id;
+    job.approvedAt = new Date();
+    job.rejectionReason = reason || null;
+    await job.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Job rejected successfully',
+      data: job,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to reject job', error: error.message });
   }
 };
 
