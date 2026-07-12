@@ -428,3 +428,98 @@ exports.rejectVendor = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Vendor forgot password — send an OTP to the registered phone
+// @route   POST /api/auth/vendor/forgot-password
+// @access  Public
+exports.vendorForgotPassword = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone, userType: 'vendor' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No vendor account found with this phone number' });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const otp = isProduction ? generateOTP() : '123456';
+
+    user.otp = otp;
+    user.otpExpire = getOTPExpiry();
+    user.otpAttempts = 0;
+    await user.save();
+
+    if (!isProduction) console.log(`[DEV ONLY] Password-reset OTP for +91${phone}: ${otp}`);
+
+    // TODO: send `otp` via a real SMS provider in production.
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to +91' + phone,
+      data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Vendor reset password using the OTP
+// @route   POST /api/auth/vendor/reset-password
+// @access  Public
+exports.vendorResetPassword = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone, otp, newPassword } = req.body;
+
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Phone, OTP and new password are required' });
+    }
+
+    const user = await User.findOne({ phone, userType: 'vendor' }).select('+otp +otpExpire +otpAttempts +password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No vendor account found with this phone number' });
+    }
+
+    if (!user.otp) {
+      return res.status(400).json({ success: false, message: 'No active OTP. Please request a new one.' });
+    }
+
+    if (user.otp !== otp) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+
+      if (user.otpAttempts >= 3) {
+        user.otp = undefined;
+        user.otpExpire = undefined;
+        user.otpAttempts = 0;
+        await user.save();
+        return res.status(400).json({ success: false, message: 'Maximum OTP attempts reached. Please request a new OTP.' });
+      }
+
+      await user.save();
+      return res.status(400).json({ success: false, message: `Invalid OTP. ${3 - user.otpAttempts} attempts remaining.` });
+    }
+
+    if (!user.otpExpire || user.otpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Valid OTP — set the new password (hashed by the pre-save hook) and clear OTP.
+    user.password = newPassword;
+    user.otp = undefined;
+    user.otpExpire = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
+  } catch (error) {
+    next(error);
+  }
+};

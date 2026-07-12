@@ -11,8 +11,11 @@ const {
   getPendingVendors,
   verifyVendor,
   rejectVendor,
+  vendorForgotPassword,
+  vendorResetPassword,
 } = require('../controllers/authController');
 const { protect, requireAdmin } = require('../middleware/auth');
+const { otpRequestLimiter, authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -30,14 +33,21 @@ const emailValidation = body('email')
 const passwordValidation = body('password')
   .isLength({ min: 8 }).withMessage('Password must be at least 8 characters');
 
+const newPasswordValidation = body('newPassword')
+  .isLength({ min: 8 }).withMessage('New password must be at least 8 characters');
+
 // ---- Worker / customer: phone + OTP ----
-router.post('/register', [phoneValidation], register);
-router.post('/verify-otp', [phoneValidation, otpValidation], verifyOtp);
-router.post('/google-login', googleAuthLogin);
+router.post('/register', otpRequestLimiter, [phoneValidation], register);
+router.post('/verify-otp', authLimiter, [phoneValidation, otpValidation], verifyOtp);
+router.post('/google-login', authLimiter, googleAuthLogin);
 
 // ---- Vendor: phone + email + password (no OTP) ----
-router.post('/vendor/register', [phoneValidation, emailValidation, passwordValidation], vendorRegister);
-router.post('/vendor/login', vendorLogin);
+router.post('/vendor/register', authLimiter, [phoneValidation, emailValidation, passwordValidation], vendorRegister);
+router.post('/vendor/login', authLimiter, vendorLogin);
+
+// ---- Vendor: forgot / reset password (OTP based) ----
+router.post('/vendor/forgot-password', otpRequestLimiter, [phoneValidation], vendorForgotPassword);
+router.post('/vendor/reset-password', authLimiter, [phoneValidation, otpValidation, newPasswordValidation], vendorResetPassword);
 
 // ---- Admin: vendor verification management ----
 router.get('/admin/vendors/pending', protect, requireAdmin, getPendingVendors);

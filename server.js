@@ -3,6 +3,9 @@ dotenv.config();
 
 const express = require('express');
 const app = express();
+// Behind Render/Nginx: trust the first proxy so req.ip is the real client IP
+// (needed for rate limiting to work per-user instead of per-proxy).
+app.set('trust proxy', 1);
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
