@@ -85,6 +85,8 @@ exports.getJobs = async (req, res) => {
       isUrgent: job.isUrgent,
       amenities: job.amenities,
       applicationsCount: job.applicationsCount || 0,
+      status: job.status,
+      approvalStatus: job.approvalStatus,
       postedAt: job.createdAt,
       postedBy: {
         id: job.postedBy?._id,
@@ -222,7 +224,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -259,7 +261,7 @@ exports.appliedJobs = async (req, res) => {
     }
 
     const data = await Application.find({ applicant: applicantID })
-      .populate('job', 'title company location latitude longitude salary salaryType isUrgent duration description experience')
+      .populate('job', 'title company location latitude longitude salary salaryType isUrgent duration description experience status approvalStatus')
       .lean();
 
     res.status(200).json({
