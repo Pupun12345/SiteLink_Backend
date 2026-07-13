@@ -163,6 +163,10 @@ const userSchema = new mongoose.Schema({
   fcmToken: { type: String, default: null },
 
   // Common fields
+  isBlocked: {
+    type: Boolean,
+    default: false,
+  },
   language: {
     type: String,
     default: 'english'

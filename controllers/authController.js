@@ -30,6 +30,13 @@ exports.register = async (req, res) => {
 
     const existingUser = await User.findOne({ phone });
 
+    if (existingUser && existingUser.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been blocked....Please Contact SiteLink For More Updates',
+      });
+    }
+
     if (existingUser) {
       existingUser.otp = otp;
       existingUser.otpExpire = otpExpire;
