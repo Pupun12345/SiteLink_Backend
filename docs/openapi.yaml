@@ -1,0 +1,712 @@
+openapi: 3.0.3
+info:
+  title: SiteLink Backend API
+  version: 1.0.0
+  description: >
+    REST API for the SiteLink construction/gig marketplace (workers, vendors,
+    customers), community feed, job board, amenities, subscription plans,
+    legal policies and push notifications. All protected endpoints use a
+    Bearer JWT.
+servers:
+  - url: http://localhost:5000
+    description: Local
+  - url: https://api.sitelink.example.com
+    description: Production
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Jobs
+  - name: Community
+  - name: Amenities
+  - name: Plans
+  - name: Legal
+  - name: Notifications
+
+paths:
+  /:
+    get:
+      tags: [Auth]
+      security: []
+      summary: Health check
+      responses:
+        '200': { description: API is running }
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Request an OTP for a phone number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "9876543210", pattern: '^[6-9]\d{9}$' }
+      responses:
+        '200':
+          description: OTP issued (SECURITY - current code returns otp in body)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      phone: { type: string }
+                      otp: { type: string }
+                      expiresIn: { type: string }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/auth/verify-otp:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Verify OTP and issue a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string, example: "9876543210" }
+                otp: { type: string, example: "123456", minLength: 6, maxLength: 6 }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/auth/google-login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Sign in with a Firebase Google ID token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firebaseIdToken]
+              properties:
+                firebaseIdToken: { type: string }
+                deviceToken: { type: string }
+                deviceType: { type: string, enum: [android, ios, web] }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current user
+      responses:
+        '200': { description: Current user }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (blacklist current JWT)
+      responses:
+        '200': { description: Logged out }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/profile/me:
+    get:
+      tags: [Profile]
+      summary: Get my profile (shape depends on userType)
+      responses:
+        '200': { description: Profile }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/profile/states:
+    get:
+      tags: [Profile]
+      security: []
+      summary: List Indian states (static)
+      responses:
+        '200': { description: States }
+
+  /api/profile/cities/{stateId}:
+    get:
+      tags: [Profile]
+      security: []
+      summary: List cities for a state (static)
+      parameters:
+        - { in: path, name: stateId, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Cities }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/profile/skills:
+    get:
+      tags: [Profile]
+      summary: List skills
+      responses:
+        '200': { description: Skills }
+
+  /api/profile/language:
+    post:
+      tags: [Profile]
+      summary: Set preferred language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [language]
+              properties: { language: { type: string, example: hindi } }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/profile/create/worker:
+    post:
+      tags: [Profile]
+      summary: Create worker profile (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/WorkerProfileForm' }
+      responses:
+        '200': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/profile/create/vendor:
+    post:
+      tags: [Profile]
+      summary: Create vendor profile (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/VendorProfileForm' }
+      responses:
+        '200': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/profile/edit/worker:
+    put:
+      tags: [Profile]
+      summary: Edit worker profile (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/WorkerProfileForm' }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/profile/edit/vendor:
+    put:
+      tags: [Profile]
+      summary: Edit vendor profile (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/VendorProfileForm' }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/jobs:
+    get:
+      tags: [Jobs]
+      security: []
+      summary: List approved jobs (no pagination — see audit)
+      parameters:
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: salaryType, schema: { type: string, enum: [daily, weekly, monthly] } }
+        - { in: query, name: sort, schema: { type: string, enum: [oldest, highestSalary, lowestSalary] } }
+      responses:
+        '200': { description: Jobs }
+    post:
+      tags: [Jobs]
+      summary: Create a job (verified vendor/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JobCreate' }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/jobs/getAppliedJobs:
+    get:
+      tags: [Jobs]
+      summary: List jobs the current worker applied to
+      responses:
+        '200': { description: Applications }
+
+  /api/jobs/{id}:
+    get:
+      tags: [Jobs]
+      security: []
+      summary: Get job detail
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Job }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Jobs]
+      summary: Delete a job (owner or admin)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/jobs/{id}/apply:
+    post:
+      tags: [Jobs]
+      summary: Apply to a job (verified worker)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '201': { description: Applied }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/jobs/{id}/like:
+    put:
+      tags: [Jobs]
+      summary: Like/unlike a job
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Toggled }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/jobs/{id}/comments:
+    get:
+      tags: [Jobs]
+      security: []
+      summary: List job comments (paginated)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 10 } }
+        - { in: query, name: sortBy, schema: { type: string, enum: [newest, oldest, popular] } }
+      responses:
+        '200': { description: Comments }
+    post:
+      tags: [Jobs]
+      summary: Add a job comment
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentCreate' }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/jobs/{jobId}/comments/{commentId}:
+    put:
+      tags: [Jobs]
+      summary: Update a job comment (author only)
+      parameters:
+        - { in: path, name: jobId, required: true, schema: { type: string } }
+        - { in: path, name: commentId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties: { comment: { type: string, maxLength: 500 } }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Jobs]
+      summary: Soft-delete a job comment (author or admin)
+      parameters:
+        - { in: path, name: jobId, required: true, schema: { type: string } }
+        - { in: path, name: commentId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/community/feed:
+    get:
+      tags: [Community]
+      summary: Community feed (approved, active posts)
+      parameters:
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 10 } }
+      responses:
+        '200': { description: Feed }
+
+  /api/community/posts:
+    post:
+      tags: [Community]
+      summary: Create a post (multipart, up to 5 images + 1 video)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 1000 }
+                feeling: { type: string }
+                images: { type: array, items: { type: string, format: binary } }
+                video: { type: string, format: binary }
+      responses:
+        '201': { description: Created }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/community/posts/{postId}/like:
+    put:
+      tags: [Community]
+      summary: Like/unlike a post
+      parameters: [{ in: path, name: postId, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Toggled }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/community/posts/{postId}:
+    delete:
+      tags: [Community]
+      summary: Delete a post (owner or admin)
+      parameters: [{ in: path, name: postId, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/community/posts/{id}/comments:
+    get:
+      tags: [Community]
+      security: []
+      summary: List post comments (paginated)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: limit, schema: { type: integer } }
+        - { in: query, name: sortBy, schema: { type: string, enum: [newest, oldest, popular] } }
+      responses:
+        '200': { description: Comments }
+    post:
+      tags: [Community]
+      summary: Add a post comment
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentCreate' }
+      responses:
+        '201': { description: Created }
+
+  /api/community/posts/{postId}/comments/{commentId}:
+    put:
+      tags: [Community]
+      summary: Update a post comment (author only)
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+        - { in: path, name: commentId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { comment: { type: string, maxLength: 500 } }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Community]
+      summary: Soft-delete a post comment (author or admin)
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+        - { in: path, name: commentId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Deleted }
+
+  /api/amenities:
+    get:
+      tags: [Amenities]
+      security: []
+      summary: List all amenities
+      responses:
+        '200': { description: Amenities }
+    post:
+      tags: [Amenities]
+      summary: Add an amenity (vendor/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category]
+              properties:
+                name: { type: string }
+                category: { type: string, enum: ['Financial Benefits', 'Accommodation & Food', 'Travel', 'Safety & Medical', 'Leave', 'Work & Career', 'Employee Rewards'] }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/amenities/grouped:
+    get:
+      tags: [Amenities]
+      security: []
+      summary: List amenities grouped by category
+      responses:
+        '200': { description: Grouped amenities }
+
+  /api/amenities/categories:
+    get:
+      tags: [Amenities]
+      summary: List distinct amenity categories
+      responses:
+        '200': { description: Categories }
+
+  /api/amenities/{id}:
+    put:
+      tags: [Amenities]
+      summary: Update an amenity (admin only)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                category: { type: string }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Amenities]
+      summary: Delete an amenity (admin only; fails if used by a job)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/plans/plans:
+    get:
+      tags: [Plans]
+      summary: List plans (filtered by caller's userType)
+      responses:
+        '200': { description: Plans }
+    post:
+      tags: [Plans]
+      summary: Create a plan (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlanCreate' }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/plans/plans/{id}:
+    put:
+      tags: [Plans]
+      summary: Update a plan (admin only)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Plans]
+      summary: Delete a plan (admin only)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/legal/policies:
+    get:
+      tags: [Legal]
+      summary: Get active legal policies
+      responses:
+        '200': { description: Policies }
+
+  /api/notifications/save-token:
+    post:
+      tags: [Notifications]
+      summary: Save an FCM token for the current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fcmToken]
+              properties:
+                fcmToken: { type: string }
+      responses:
+        '200': { description: Saved }
+
+  /api/notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Send a push notification (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string }
+                title: { type: string }
+                message: { type: string }
+      responses:
+        '200': { description: Sent }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Bad request
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ValidationError:
+      description: Validation failed
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Missing/invalid token
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Not authorized for this action
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Resource not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ServerError:
+      description: Server error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+        error: { type: string }
+    AuthResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        token: { type: string }
+        isExist: { type: boolean }
+        user: { type: object }
+    CommentCreate:
+      type: object
+      required: [comment]
+      properties:
+        comment: { type: string, maxLength: 500 }
+        parentComment: { type: string, nullable: true }
+    JobCreate:
+      type: object
+      required: [title, company, location, description, experience, quantity, salary, latitude, longitude, amenities]
+      properties:
+        title: { type: string }
+        company: { type: string }
+        location: { type: string }
+        latitude: { type: string }
+        longitude: { type: string }
+        quantity: { type: string, example: "3" }
+        salary: { type: number }
+        salaryType: { type: string, enum: [daily, weekly, monthly] }
+        isUrgent: { type: boolean }
+        duration: { type: string }
+        description: { type: string }
+        experience: { type: string, example: "3" }
+        amenities: { type: array, items: { type: integer } }
+    PlanCreate:
+      type: object
+      required: [planName, userType, planType, frequency, amount]
+      properties:
+        planName: { type: string }
+        userType: { type: string, enum: [vendor, worker] }
+        planType: { type: string, enum: [basic, premium] }
+        frequency: { type: string, enum: [monthly, yearly] }
+        amount: { type: number }
+        features: { type: array, items: { type: string } }
+    WorkerProfileForm:
+      type: object
+      required: [primarySkillId, governmentID]
+      properties:
+        name: { type: string }
+        primarySkillId: { type: integer }
+        secondarySkillId: { type: string, description: 'JSON array or single id' }
+        otherSkill: { type: string }
+        dateOfBirth: { type: string, example: "1995-06-15" }
+        gender: { type: string, enum: [male, female, other] }
+        totalExperience: { type: number }
+        experienceDescription: { type: string }
+        willingtoRelocate: { type: boolean }
+        salaryType: { type: string }
+        salary: { type: number }
+        workStateID: { type: integer }
+        workCityID: { type: integer }
+        location: { type: string }
+        governmentID: { type: string, format: binary }
+        profileImage: { type: string, format: binary }
+        workSamplesPhoto: { type: array, items: { type: string, format: binary } }
+        experienceCertificate: { type: string, format: binary }
+    VendorProfileForm:
+      type: object
+      required: [companyName, name, designation, panNumber, panCardImage, gstCertificate]
+      properties:
+        companyName: { type: string }
+        name: { type: string }
+        email: { type: string }
+        designation: { type: string }
+        panNumber: { type: string }
+        gstNumber: { type: string }
+        whatsappNumber: { type: string }
+        website: { type: string }
+        workArea: { type: string }
+        workStateID: { type: integer }
+        workCityID: { type: integer }
+        panCardImage: { type: string, format: binary }
+        gstCertificate: { type: string, format: binary }
+        companyLogo: { type: string, format: binary }
+        profileImage: { type: string, format: binary }

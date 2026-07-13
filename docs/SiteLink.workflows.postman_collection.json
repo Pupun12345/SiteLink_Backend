@@ -1,0 +1,481 @@
+{
+  "info": {
+    "name": "SiteLink — Worker & Vendor Workflows",
+    "_postman_id": "c2f3d4e5-0000-4b00-9000-sitelinkflow01",
+    "description": "Role-based, run-top-to-bottom collection for SiteLink.\n\nFolders:\n  A. Worker — Full Journey  (register -> verify -> create worker profile -> browse/apply/like/comment -> community -> logout)\n  B. Vendor — Full Journey  (register -> verify -> create vendor profile -> create job -> amenities -> community -> logout)\n  C. Reference Data (public)\n\nHOW TO USE\n1. Import this + SiteLink.postman_environment.json, select 'SiteLink - Local', run `npm start`.\n2. Open folder A (or B) and Send each request top to bottom.\n3. Verify-OTP saves the role token (workerToken / vendorToken) automatically; Get Skills saves primarySkillId; Browse Jobs saves jobId; Create Post saves postId; Add Comment saves commentId.\n4. VERIFICATION GATE: before 'Apply to Job' (worker) or 'Create Job' (vendor) you must mark the account verified in Mongo — see docs/WORKFLOWS.md. Otherwise those return 403 by design.\n5. File-upload steps: attach your own files to the form-data 'file' fields.\n\nDev OTP is always 123456 when NODE_ENV != production.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "workerToken", "value": "", "type": "string" },
+    { "key": "vendorToken", "value": "", "type": "string" },
+    { "key": "workerPhone", "value": "9876500001", "type": "string" },
+    { "key": "vendorPhone", "value": "9876500002", "type": "string" },
+    { "key": "workerUserId", "value": "", "type": "string" },
+    { "key": "vendorUserId", "value": "", "type": "string" },
+    { "key": "primarySkillId", "value": "1", "type": "string" },
+    { "key": "jobId", "value": "", "type": "string" },
+    { "key": "postId", "value": "", "type": "string" },
+    { "key": "commentId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "A. Worker — Full Journey",
+      "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{workerToken}}", "type": "string" }] },
+      "item": [
+        {
+          "name": "01 Register (request OTP)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{workerPhone}}\"\n}" },
+            "description": "Dev OTP = 123456 (returned only when NODE_ENV != production)."
+          }
+        },
+        {
+          "name": "02 Verify OTP (login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('workerToken', res.token);",
+                  "  if (res.user && res.user.id) pm.collectionVariables.set('workerUserId', res.user.id);",
+                  "  pm.test('worker token stored', () => pm.expect(res.token).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["api", "auth", "verify-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{workerPhone}}\",\n  \"otp\": \"123456\"\n}" },
+            "description": "Saves {{workerToken}}. New user has userType=null until the worker profile is created."
+          }
+        },
+        {
+          "name": "03 Get States (pick stateId)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/states", "host": ["{{baseUrl}}"], "path": ["api", "profile", "states"] } }
+        },
+        {
+          "name": "04 Get Cities (14 = Maharashtra)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/cities/14", "host": ["{{baseUrl}}"], "path": ["api", "profile", "cities", "14"] } }
+        },
+        {
+          "name": "05 Get Skills (saves primarySkillId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.length && res.data[0].id != null) {",
+                  "  pm.collectionVariables.set('primarySkillId', String(res.data[0].id));",
+                  "} else {",
+                  "  console.log('No skills seeded — seed skills so worker profile can be created.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/skills", "host": ["{{baseUrl}}"], "path": ["api", "profile", "skills"] } }
+        },
+        {
+          "name": "06 Create Worker Profile (multipart)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/profile/create/worker", "host": ["{{baseUrl}}"], "path": ["api", "profile", "create", "worker"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Ravi Kumar", "type": "text" },
+                { "key": "primarySkillId", "value": "{{primarySkillId}}", "type": "text" },
+                { "key": "secondarySkillId", "value": "[]", "type": "text" },
+                { "key": "otherSkill", "value": "Scaffolding", "type": "text" },
+                { "key": "dateOfBirth", "value": "1995-06-15", "type": "text" },
+                { "key": "gender", "value": "male", "type": "text" },
+                { "key": "totalExperience", "value": "5", "type": "text" },
+                { "key": "experienceDescription", "value": "5 years masonry", "type": "text" },
+                { "key": "willingtoRelocate", "value": "true", "type": "text" },
+                { "key": "salaryType", "value": "daily", "type": "text" },
+                { "key": "salary", "value": "900", "type": "text" },
+                { "key": "workStateID", "value": "14", "type": "text" },
+                { "key": "workCityID", "value": "1", "type": "text" },
+                { "key": "location", "value": "Andheri, Mumbai", "type": "text" },
+                { "key": "governmentID", "type": "file", "src": [] },
+                { "key": "profileImage", "type": "file", "src": [] },
+                { "key": "workSamplesPhoto", "type": "file", "src": [] },
+                { "key": "experienceCertificate", "type": "file", "src": [] }
+              ]
+            },
+            "description": "governmentID file is MANDATORY. Sets userType='worker'. Attach files before sending."
+          }
+        },
+        {
+          "name": "07 Set Language",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/profile/language", "host": ["{{baseUrl}}"], "path": ["api", "profile", "language"] },
+            "body": { "mode": "raw", "raw": "{\n  \"language\": \"hindi\"\n}" }
+          }
+        },
+        {
+          "name": "08 Get My Profile",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/me", "host": ["{{baseUrl}}"], "path": ["api", "profile", "me"] } }
+        },
+        {
+          "name": "09 Browse Jobs (saves jobId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.length && res.data[0]._id) pm.collectionVariables.set('jobId', res.data[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["api", "jobs"], "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" } ] } }
+        },
+        {
+          "name": "10 Get Job Details",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}"] } }
+        },
+        {
+          "name": "11 Apply to Job (verified worker only)",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}/apply", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}", "apply"] }, "description": "403 unless isVerified=true AND verificationStatus='verified' (see docs/WORKFLOWS.md)." }
+        },
+        {
+          "name": "12 Get Applied Jobs",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs/getAppliedJobs", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "getAppliedJobs"] } }
+        },
+        {
+          "name": "13 Like / Unlike Job",
+          "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}/like", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}", "like"] } }
+        },
+        {
+          "name": "14 Add Job Comment (saves commentId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data._id) pm.collectionVariables.set('commentId', res.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}/comments", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}", "comments"] },
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"Is accommodation provided?\",\n  \"parentComment\": null\n}" }
+          }
+        },
+        {
+          "name": "15 Get Job Comments",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}/comments?page=1&limit=10&sortBy=newest", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}", "comments"], "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" }, { "key": "sortBy", "value": "newest" } ] } }
+        },
+        {
+          "name": "16 Community Feed",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/community/feed?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["api", "community", "feed"], "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" } ] } }
+        },
+        {
+          "name": "17 Create Post (saves postId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data._id) pm.collectionVariables.set('postId', res.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/community/posts", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts"] },
+            "body": { "mode": "formdata", "formdata": [ { "key": "content", "value": "Completed a great project today!", "type": "text" }, { "key": "feeling", "value": "proud", "type": "text" }, { "key": "images", "type": "file", "src": [] }, { "key": "video", "type": "file", "src": [] } ] }
+          }
+        },
+        {
+          "name": "18 Like / Unlike Post",
+          "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/api/community/posts/{{postId}}/like", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts", "{{postId}}", "like"] } }
+        },
+        {
+          "name": "19 Add Post Comment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/community/posts/{{postId}}/comments", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts", "{{postId}}", "comments"] },
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"Great work!\",\n  \"parentComment\": null\n}" }
+          }
+        },
+        {
+          "name": "20 Edit Worker Profile (multipart)",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/profile/edit/worker", "host": ["{{baseUrl}}"], "path": ["api", "profile", "edit", "worker"] },
+            "body": { "mode": "formdata", "formdata": [ { "key": "salary", "value": "1000", "type": "text" }, { "key": "willingtoRelocate", "value": "false", "type": "text" } ] },
+            "description": "Send only the fields you want to change."
+          }
+        },
+        {
+          "name": "21 Save FCM Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/save-token", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "save-token"] },
+            "body": { "mode": "raw", "raw": "{\n  \"fcmToken\": \"<device-fcm-token>\"\n}" }
+          }
+        },
+        {
+          "name": "22 Get Plans",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/plans/plans", "host": ["{{baseUrl}}"], "path": ["api", "plans", "plans"] } }
+        },
+        {
+          "name": "23 Get Legal Policies",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/legal/policies", "host": ["{{baseUrl}}"], "path": ["api", "legal", "policies"] } }
+        },
+        {
+          "name": "24 Logout",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] } }
+        }
+      ]
+    },
+    {
+      "name": "B. Vendor — Full Journey",
+      "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{vendorToken}}", "type": "string" }] },
+      "item": [
+        {
+          "name": "01 Register (request OTP)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{vendorPhone}}\"\n}" }
+          }
+        },
+        {
+          "name": "02 Verify OTP (login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('vendorToken', res.token);",
+                  "  if (res.user && res.user.id) pm.collectionVariables.set('vendorUserId', res.user.id);",
+                  "  pm.test('vendor token stored', () => pm.expect(res.token).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["api", "auth", "verify-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{vendorPhone}}\",\n  \"otp\": \"123456\"\n}" },
+            "description": "Saves {{vendorToken}}."
+          }
+        },
+        {
+          "name": "03 Get States",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/states", "host": ["{{baseUrl}}"], "path": ["api", "profile", "states"] } }
+        },
+        {
+          "name": "04 Get Cities (14 = Maharashtra)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/cities/14", "host": ["{{baseUrl}}"], "path": ["api", "profile", "cities", "14"] } }
+        },
+        {
+          "name": "05 Get Grouped Amenities (pick ids for jobs)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/amenities/grouped", "host": ["{{baseUrl}}"], "path": ["api", "amenities", "grouped"] } }
+        },
+        {
+          "name": "06 Create Vendor Profile (multipart)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/profile/create/vendor", "host": ["{{baseUrl}}"], "path": ["api", "profile", "create", "vendor"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "companyName", "value": "BuildRight Pvt Ltd", "type": "text" },
+                { "key": "name", "value": "Anil Shah", "type": "text" },
+                { "key": "email", "value": "anil@buildright.com", "type": "text" },
+                { "key": "designation", "value": "Owner", "type": "text" },
+                { "key": "panNumber", "value": "ABCDE1234F", "type": "text" },
+                { "key": "gstNumber", "value": "27ABCDE1234F1Z5", "type": "text" },
+                { "key": "whatsappNumber", "value": "9876500000", "type": "text" },
+                { "key": "website", "value": "https://buildright.com", "type": "text" },
+                { "key": "workArea", "value": "Mumbai Metro", "type": "text" },
+                { "key": "workStateID", "value": "14", "type": "text" },
+                { "key": "workCityID", "value": "1", "type": "text" },
+                { "key": "panCardImage", "type": "file", "src": [] },
+                { "key": "gstCertificate", "type": "file", "src": [] },
+                { "key": "companyLogo", "type": "file", "src": [] },
+                { "key": "profileImage", "type": "file", "src": [] }
+              ]
+            },
+            "description": "panCardImage + gstCertificate files are MANDATORY. Sets userType='vendor'."
+          }
+        },
+        {
+          "name": "07 Get My Profile",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/me", "host": ["{{baseUrl}}"], "path": ["api", "profile", "me"] } }
+        },
+        {
+          "name": "08 Create Job (verified vendor only; saves jobId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data._id) pm.collectionVariables.set('jobId', res.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/jobs", "host": ["{{baseUrl}}"], "path": ["api", "jobs"] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Mason Required\",\n  \"company\": \"BuildRight\",\n  \"location\": \"Mumbai\",\n  \"latitude\": \"19.07\",\n  \"longitude\": \"72.87\",\n  \"quantity\": \"3\",\n  \"salary\": 900,\n  \"salaryType\": \"daily\",\n  \"isUrgent\": true,\n  \"duration\": \"15 days\",\n  \"description\": \"Experienced masons for a residential site\",\n  \"experience\": \"3\",\n  \"amenities\": []\n}" },
+            "description": "403 unless isVerified=true. amenities = numeric ids from step 05 (empty array is fine)."
+          }
+        },
+        {
+          "name": "09 Browse Jobs",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["api", "jobs"], "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" } ] } }
+        },
+        {
+          "name": "10 Get Job Details",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}"] } }
+        },
+        {
+          "name": "11 Get Job Comments (applicant questions)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}/comments?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}", "comments"], "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" } ] } }
+        },
+        {
+          "name": "12 Add Amenity (vendor allowed)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/amenities", "host": ["{{baseUrl}}"], "path": ["api", "amenities"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Provident Fund\",\n  \"category\": \"Financial Benefits\"\n}" },
+            "description": "category must be one of: Financial Benefits, Accommodation & Food, Travel, Safety & Medical, Leave, Work & Career, Employee Rewards."
+          }
+        },
+        {
+          "name": "13 Create Post (saves postId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data._id) pm.collectionVariables.set('postId', res.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/community/posts", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts"] },
+            "body": { "mode": "formdata", "formdata": [ { "key": "content", "value": "We are hiring masons in Mumbai!", "type": "text" }, { "key": "feeling", "value": "hiring", "type": "text" }, { "key": "images", "type": "file", "src": [] } ] }
+          }
+        },
+        {
+          "name": "14 Like / Unlike Post",
+          "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/api/community/posts/{{postId}}/like", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts", "{{postId}}", "like"] } }
+        },
+        {
+          "name": "15 Add Post Comment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/community/posts/{{postId}}/comments", "host": ["{{baseUrl}}"], "path": ["api", "community", "posts", "{{postId}}", "comments"] },
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"DM for details\",\n  \"parentComment\": null\n}" }
+          }
+        },
+        {
+          "name": "16 Edit Vendor Profile (multipart)",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/profile/edit/vendor", "host": ["{{baseUrl}}"], "path": ["api", "profile", "edit", "vendor"] },
+            "body": { "mode": "formdata", "formdata": [ { "key": "workArea", "value": "Pune", "type": "text" } ] }
+          }
+        },
+        {
+          "name": "17 Delete Job (owner/admin)",
+          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/api/jobs/{{jobId}}", "host": ["{{baseUrl}}"], "path": ["api", "jobs", "{{jobId}}"] } }
+        },
+        {
+          "name": "18 Save FCM Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/save-token", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "save-token"] },
+            "body": { "mode": "raw", "raw": "{\n  \"fcmToken\": \"<device-fcm-token>\"\n}" }
+          }
+        },
+        {
+          "name": "19 Get Plans",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/plans/plans", "host": ["{{baseUrl}}"], "path": ["api", "plans", "plans"] } }
+        },
+        {
+          "name": "20 Logout",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] } }
+        }
+      ]
+    },
+    {
+      "name": "C. Reference Data (public)",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] } }
+        },
+        {
+          "name": "Get States",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/states", "host": ["{{baseUrl}}"], "path": ["api", "profile", "states"] } }
+        },
+        {
+          "name": "Get Cities by State",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/profile/cities/14", "host": ["{{baseUrl}}"], "path": ["api", "profile", "cities", "14"] } }
+        },
+        {
+          "name": "Get All Amenities",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/amenities", "host": ["{{baseUrl}}"], "path": ["api", "amenities"] } }
+        },
+        {
+          "name": "Get Grouped Amenities",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/amenities/grouped", "host": ["{{baseUrl}}"], "path": ["api", "amenities", "grouped"] } }
+        }
+      ]
+    }
+  ]
+}

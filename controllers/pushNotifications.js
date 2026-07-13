@@ -3,9 +3,9 @@ const sendNotification = require("../utils/sendNotification");
 
 exports.saveFcmToken = async (req, res) => {
   try {
-    const { userId, fcmToken } = req.body;
+    const { fcmToken } = req.body;
 
-    await User.findByIdAndUpdate(userId, {
+    await User.findByIdAndUpdate(req.user.id, {
       fcmToken,
     });
     res.status(200).json({

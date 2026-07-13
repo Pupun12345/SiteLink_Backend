@@ -1,9 +1,8 @@
 const User = require('../models/User');
-const { sendTokenResponse, generateToken } = require('../utils/tokenUtils');
+const { sendTokenResponse } = require('../utils/tokenUtils');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
-const crypto = require('crypto');
 const admin = require('../config/firebase');
 
 // @desc    Register user
@@ -28,6 +27,9 @@ exports.register = async (req, res) => {
         : "123456";
     const otpExpire = getOTPExpiry();
 
+    // TODO: integrate a real SMS provider and send `otp` there instead of exposing it here.
+    const isProduction = process.env.NODE_ENV === 'production';
+
     const existingUser = await User.findOne({ phone });
 
     if (existingUser && existingUser.isBlocked) {
@@ -42,25 +44,25 @@ exports.register = async (req, res) => {
       existingUser.otpExpire = otpExpire;
       existingUser.otpAttempts = 0;
       await existingUser.save();
-      console.log(`OTP for +91${phone}: ${otp}`);
+      if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
       return res.status(200).json({
         success: true,
         message: 'OTP sent to +91' + phone,
-        data: { phone, otp, expiresIn: '10 minutes' },
+        data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
       });
     }
 
     const user = await User.create({ phone, otp, otpExpire, otpAttempts: 0, isPhoneVerified: false });
-    console.log(`OTP for +91${phone}: ${otp}`);
+    if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
     res.status(200).json({
       success: true,
       message: 'Registration successful. OTP sent to +91' + phone,
       data: {
         phone: user.phone,
-        otp: otp,
         expiresIn: '10 minutes',
+        ...(isProduction ? {} : { otp }),
       },
     });
   } catch (error) {
@@ -73,18 +75,57 @@ exports.register = async (req, res) => {
   }
 };
 
+// @desc    Resend OTP to an existing phone number
+// @route   POST /api/auth/resend-otp
+// @access  Public
+exports.resendOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number. Please register first.',
+      });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const otp = isProduction ? generateOTP() : '123456';
+
+    user.otp = otp;
+    user.otpExpire = getOTPExpiry();
+    user.otpAttempts = 0;
+    await user.save();
+
+    if (!isProduction) console.log(`[DEV ONLY] Resent OTP for +91${phone}: ${otp}`);
+
+    // TODO: send `otp` via a real SMS provider in production.
+    res.status(200).json({
+      success: true,
+      message: 'OTP resent to +91' + phone,
+      data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend OTP',
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Verify OTP
 // @route   POST /api/auth/verify-otp
 // @access  Public
 exports.verifyOtp = async (req, res, next) => {
   try {
     const { phone, otp } = req.body;
-
-    //User Exists or not
-    const userExist = await User.findOne({ phone, isPhoneVerified: true });
-    if (userExist) {
-      return sendTokenResponse(userExist, 200, res, true);
-    }
 
     // Validate phone & OTP
     if (!phone || !otp) {
@@ -93,7 +134,6 @@ exports.verifyOtp = async (req, res, next) => {
         message: 'Please provide phone number and OTP',
       });
     }
-
 
     // Find user with OTP and phone
     const user = await User.findOne({ phone }).select('+otp +otpExpire +otpAttempts');
@@ -104,6 +144,8 @@ exports.verifyOtp = async (req, res, next) => {
         message: 'User not found',
       });
     }
+
+    const wasAlreadyVerified = user.isPhoneVerified;
 
     // Check if OTP matches
     if (user.otp !== otp) {
@@ -132,7 +174,7 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     // Check if OTP has expired
-    if (user.otpExpire < Date.now()) {
+    if (!user.otpExpire || user.otpExpire < Date.now()) {
       return res.status(400).json({
         success: false,
         message: 'OTP has expired. Please request a new one.',
@@ -146,7 +188,7 @@ exports.verifyOtp = async (req, res, next) => {
     user.otpAttempts = 0;
     await user.save();
 
-    sendTokenResponse(user, 200, res);
+    sendTokenResponse(user, 200, res, wasAlreadyVerified);
   } catch (error) {
     next(error);
   }
@@ -162,8 +204,6 @@ exports.googleAuthLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Request body is missing. Send JSON with Content-Type: application/json' });
     }
     const { firebaseIdToken, deviceToken, deviceType } = req.body;
-    console.log('Received token length:', firebaseIdToken?.length);
-    console.log('Token preview:', firebaseIdToken?.substring(0, 50));
 
     if (!firebaseIdToken) {
       return res.status(400).json({ success: false, message: 'Firebase ID token is required' });
@@ -276,5 +316,262 @@ exports.logout = async (req, res) => {
       success: false,
       message: "Logout failed",
     });
+  }
+};
+
+// @desc    Register a vendor (phone + email + password, no OTP)
+// @route   POST /api/auth/vendor/register
+// @access  Public
+exports.vendorRegister = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { name, phone, email, password } = req.body;
+
+    if (!phone || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone, email and password are required',
+      });
+    }
+
+    // Reject if phone or email already in use
+    const existing = await User.findOne({ $or: [{ phone }, { email: email.toLowerCase() }] });
+    if (existing) {
+      const field = existing.phone === phone ? 'phone number' : 'email';
+      return res.status(400).json({
+        success: false,
+        message: `This ${field} is already registered`,
+      });
+    }
+
+    const user = await User.create({
+      name: name || null,
+      phone,
+      email: email.toLowerCase(),
+      password,               // hashed by pre-save hook
+      userType: 'vendor',
+      authProvider: 'phone',
+      isPhoneVerified: false,
+      isVerified: false,
+      verificationStatus: 'pending',
+    });
+
+    // Auto-login after registration. Vendor is 'pending' until an admin verifies.
+    sendTokenResponse(user, 201, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Vendor login with phone/email + password
+// @route   POST /api/auth/vendor/login
+// @access  Public
+exports.vendorLogin = async (req, res, next) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    if ((!email && !phone) || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email or phone, and password',
+      });
+    }
+
+    const query = email ? { email: email.toLowerCase() } : { phone };
+    const user = await User.findOne(query).select('+password');
+
+    // Same generic message whether the account is missing or the password is wrong
+    if (!user || !user.password) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (user.userType !== 'vendor') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is not a vendor account. Please use the correct login.',
+      });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    sendTokenResponse(user, 200, res, true);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    List vendors awaiting verification
+// @route   GET /api/auth/admin/vendors/pending
+// @access  Private (admin only)
+exports.getPendingVendors = async (req, res, next) => {
+  try {
+    const vendors = await User.find({ userType: 'vendor', verificationStatus: 'pending' })
+      .select('name phone email companyName gstNumber panNumber city workState createdAt verificationStatus isVerified')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: vendors.length, data: vendors });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify (approve) a vendor
+// @route   PUT /api/auth/admin/vendors/:id/verify
+// @access  Private (admin only)
+exports.verifyVendor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.userType !== 'vendor') {
+      return res.status(400).json({ success: false, message: 'This user is not a vendor' });
+    }
+
+    user.isVerified = true;
+    user.verificationStatus = 'verified';
+    user.verificationReviewedAt = new Date();
+    user.verificationRejectedReason = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor verified successfully',
+      data: { id: user._id, verificationStatus: user.verificationStatus, isVerified: user.isVerified },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reject a vendor's verification
+// @route   PUT /api/auth/admin/vendors/:id/reject
+// @access  Private (admin only)
+exports.rejectVendor = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.userType !== 'vendor') {
+      return res.status(400).json({ success: false, message: 'This user is not a vendor' });
+    }
+
+    user.isVerified = false;
+    user.verificationStatus = 'rejected';
+    user.verificationReviewedAt = new Date();
+    user.verificationRejectedReason = reason || null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor verification rejected',
+      data: { id: user._id, verificationStatus: user.verificationStatus, verificationRejectedReason: user.verificationRejectedReason },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Vendor forgot password — send an OTP to the registered phone
+// @route   POST /api/auth/vendor/forgot-password
+// @access  Public
+exports.vendorForgotPassword = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone, userType: 'vendor' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No vendor account found with this phone number' });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const otp = isProduction ? generateOTP() : '123456';
+
+    user.otp = otp;
+    user.otpExpire = getOTPExpiry();
+    user.otpAttempts = 0;
+    await user.save();
+
+    if (!isProduction) console.log(`[DEV ONLY] Password-reset OTP for +91${phone}: ${otp}`);
+
+    // TODO: send `otp` via a real SMS provider in production.
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to +91' + phone,
+      data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Vendor reset password using the OTP
+// @route   POST /api/auth/vendor/reset-password
+// @access  Public
+exports.vendorResetPassword = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone, otp, newPassword } = req.body;
+
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Phone, OTP and new password are required' });
+    }
+
+    const user = await User.findOne({ phone, userType: 'vendor' }).select('+otp +otpExpire +otpAttempts +password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No vendor account found with this phone number' });
+    }
+
+    if (!user.otp) {
+      return res.status(400).json({ success: false, message: 'No active OTP. Please request a new one.' });
+    }
+
+    if (user.otp !== otp) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+
+      if (user.otpAttempts >= 3) {
+        user.otp = undefined;
+        user.otpExpire = undefined;
+        user.otpAttempts = 0;
+        await user.save();
+        return res.status(400).json({ success: false, message: 'Maximum OTP attempts reached. Please request a new OTP.' });
+      }
+
+      await user.save();
+      return res.status(400).json({ success: false, message: `Invalid OTP. ${3 - user.otpAttempts} attempts remaining.` });
+    }
+
+    if (!user.otpExpire || user.otpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Valid OTP — set the new password (hashed by the pre-save hook) and clear OTP.
+    user.password = newPassword;
+    user.otp = undefined;
+    user.otpExpire = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
+  } catch (error) {
+    next(error);
   }
 };

@@ -17,7 +17,7 @@ const errorHandler = ( err, req, res, next)=> {
         const field = Object.keys(err.keyPattern)[0];
         const message = `This ${field} is already registered`
         return res.status(400).json({
-            success:true,
+            success:false,
             message:message,
             error: message,
         });

@@ -13,11 +13,14 @@ const sendTokenResponse = (user, statusCode, res,isExists=false) => {
     id: user._id,
     phone: user.phone,
     isPhoneVerified: user.isPhoneVerified,
-    userType: user.userType,
+    userType: user.userType || '',   // '' for a brand-new user (no role yet)
     role: user.role,
     name: user.name,
     email: user.email,
     profileImage: user.profileImage,
+    isProfileCreated: user.isProfileCreated,
+    isVerified: user.isVerified,
+    verificationStatus: user.verificationStatus,
   };
 
   // Add worker-specific fields if profile already created
@@ -49,6 +52,7 @@ const sendTokenResponse = (user, statusCode, res,isExists=false) => {
     success: true,
     token,
     isExist: isExists,
+    isNewUser: !isExists,
     user: userData,
   });
 };

@@ -3,6 +3,9 @@ dotenv.config();
 
 const express = require('express');
 const app = express();
+// Behind Render/Nginx: trust the first proxy so req.ip is the real client IP
+// (needed for rate limiting to work per-user instead of per-proxy).
+app.set('trust proxy', 1);
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -11,10 +14,10 @@ const { trackApiRequest } = require('./middleware/apiTracker');
 const jobRoutes = require('./routes/jobRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const legalRoutes = require('./routes/legalRoutes');
+const amenityRoutes = require('./routes/amenityRoutes');
 
 // API Request Tracking Middleware
-app.use(trackApiRequest)
-app.use('/api', trackApiRequest);
+app.use(trackApiRequest);
 
 // Middleware
 app.use(cors());
@@ -32,6 +35,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/plans', require('./routes/planRoutes'));
+app.use('/api/amenities', amenityRoutes);
 
 
 
@@ -52,11 +56,6 @@ app.get('/firebase-messaging-sw.js', (req, res) => {
   res.sendFile(__dirname + '/firebase-messaging-sw.js');
 });
 
-app.get('/get-fcm-token', (req, res) => {
-  res.sendFile(__dirname + '/get-fcm-token.html');
-});
-
-
 // Root route
 app.get('/', (req, res) => {
   res.json({
@@ -76,11 +75,6 @@ app.use((req, res) => {
 
 // Error handler
 app.use(errorHandler);
-
-app.get('/test-auth', (req, res) => {
-  res.sendFile(__dirname + '/server.html');
-});
-
 
 // Start server only after DB is connected and indexes are fixed
 const PORT = process.env.PORT || 5000;

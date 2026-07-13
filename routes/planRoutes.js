@@ -5,14 +5,14 @@ const {
   editPlanAmount,
   deletePlan
 } = require('../controllers/planController');
-const { protect } = require('../middleware/auth');
+const { protect, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.use(protect);
 router.get('/plans', getPlans);
-router.post('/plans', createPlan);
-router.put('/plans/:id', editPlanAmount);
-router.delete('/plans/:id', deletePlan);
+router.post('/plans', requireAdmin, createPlan);
+router.put('/plans/:id', requireAdmin, editPlanAmount);
+router.delete('/plans/:id', requireAdmin, deletePlan);
 
 module.exports = router;

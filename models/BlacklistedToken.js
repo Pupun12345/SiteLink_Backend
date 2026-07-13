@@ -4,6 +4,7 @@ const blacklistedTokenSchema = new mongoose.Schema({
   token: {
     type: String,
     required: true,
+    index: true,
   },
   createdAt: {
     type: Date,

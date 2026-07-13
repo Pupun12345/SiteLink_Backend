@@ -75,6 +75,27 @@ exports.authorize = (...roles) => {
   };
 };
 
+// Require the logged-in user to be an admin.
+// Uses userType (not role — role gets overwritten with the user's skill/designation
+// during profile creation, so it cannot be trusted for authorization).
+exports.requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized to access this route',
+    });
+  }
+
+  if (req.user.userType !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required',
+    });
+  }
+
+  next();
+};
+
 exports.applicable = async (req, res, next) => {
   const {id:applicantId}=req.user;
 

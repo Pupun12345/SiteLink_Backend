@@ -169,6 +169,7 @@ const userSchema = new mongoose.Schema({
   },
   language: {
     type: String,
+    enum: ['hindi', 'english'],
     default: 'english'
   },
   isPhoneVerified: {
