@@ -43,6 +43,15 @@ exports.protect = async (req, res, next) => {
         message: 'User not found',
       });
     }
+
+    if (req.user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been blocked....Please Contact SiteLink Support For More Updates".',
+        isBlocked: true,
+      });
+    }
+
     next();
 
   } catch (error) {
