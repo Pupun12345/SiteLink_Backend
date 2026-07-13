@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const {
   register,
+  resendOtp,
   verifyOtp,
   logout,
   getMe,
@@ -38,6 +39,7 @@ const newPasswordValidation = body('newPassword')
 
 // ---- Worker / customer: phone + OTP ----
 router.post('/register', otpRequestLimiter, [phoneValidation], register);
+router.post('/resend-otp', otpRequestLimiter, [phoneValidation], resendOtp);
 router.post('/verify-otp', authLimiter, [phoneValidation, otpValidation], verifyOtp);
 router.post('/google-login', authLimiter, googleAuthLogin);
 

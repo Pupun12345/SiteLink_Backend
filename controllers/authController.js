@@ -68,6 +68,51 @@ exports.register = async (req, res) => {
   }
 };
 
+// @desc    Resend OTP to an existing phone number
+// @route   POST /api/auth/resend-otp
+// @access  Public
+exports.resendOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number. Please register first.',
+      });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const otp = isProduction ? generateOTP() : '123456';
+
+    user.otp = otp;
+    user.otpExpire = getOTPExpiry();
+    user.otpAttempts = 0;
+    await user.save();
+
+    if (!isProduction) console.log(`[DEV ONLY] Resent OTP for +91${phone}: ${otp}`);
+
+    // TODO: send `otp` via a real SMS provider in production.
+    res.status(200).json({
+      success: true,
+      message: 'OTP resent to +91' + phone,
+      data: { phone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend OTP',
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Verify OTP
 // @route   POST /api/auth/verify-otp
 // @access  Public
