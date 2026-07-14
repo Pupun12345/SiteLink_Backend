@@ -240,9 +240,17 @@ exports.googleAuthLogin = async (req, res) => {
     let user = await User.findOne({ firebaseUid: uid });
     const isExist = !!user;
 
+    if (user && user.isBlocked) {
+      return res.status(403).json({ success: false, message: 'Your account has been blocked....Please Contact SiteLink For More Updates' });
+    }
+
     if (!user) {
       // Check if email already registered via phone auth
       if (email) user = await User.findOne({ email });
+
+      if (user && user.isBlocked) {
+        return res.status(403).json({ success: false, message: 'Your account has been blocked....Please Contact SiteLink For More Updates' });
+      }
 
       if (user) {
         // Link Google to existing account
@@ -399,6 +407,10 @@ exports.vendorLogin = async (req, res, next) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ success: false, message: 'Your account has been blocked. Please contact support.' });
     }
 
     sendTokenResponse(user, 200, res, true);
