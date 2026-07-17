@@ -189,6 +189,25 @@ const userSchema = new mongoose.Schema({
     ref: 'Subscription',
     default: null,
   },
+  // Razorpay subscription state
+  activePlan: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PlanDetails',
+    default: null,
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['inactive', 'active', 'expired'],
+    default: 'inactive',
+  },
+  subscriptionExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  lastPaymentId: {
+    type: String,
+    default: null,
+  },
   verificationStatus: {
     type: String,
     enum: ['pending', 'verified', 'rejected'],

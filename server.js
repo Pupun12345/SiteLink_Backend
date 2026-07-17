@@ -36,6 +36,7 @@ app.use('/api/legal', legalRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/plans', require('./routes/planRoutes'));
 app.use('/api/amenities', amenityRoutes);
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 
 
