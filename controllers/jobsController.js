@@ -20,6 +20,8 @@ function _formatJobSummary(job) {
     longitude: job.longitude,
     workersNeeded: job.quantity,
     duration: job.duration || null,
+    experience: job.experience || null,
+    description: job.description || null,
     salary: job.salary,
     salaryType: job.salaryType,
     isUrgent: job.isUrgent,
@@ -418,8 +420,8 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    // Admin-posted jobs go live immediately; vendor-posted jobs need admin approval.
-    const isAdminPoster = user.userType === 'admin';
+    // Admin- and vendor-posted jobs go live immediately; other roles need admin approval.
+    const isAutoApproved = user.userType === 'admin' || user.userType === 'vendor';
 
     const job = await Job.create({
       title: title.trim(),
@@ -437,15 +439,15 @@ exports.createJob = async (req, res) => {
       experience: exp,
       postedBy: req.user.id,
       isActive: true,
-      approvalStatus: isAdminPoster ? 'approved' : 'pending',
-      autoApproved: isAdminPoster,
-      approvedBy: isAdminPoster ? req.user.id : null,
-      approvedAt: isAdminPoster ? new Date() : null,
+      approvalStatus: isAutoApproved ? 'approved' : 'pending',
+      autoApproved: isAutoApproved,
+      approvedBy: isAutoApproved ? req.user.id : null,
+      approvedAt: isAutoApproved ? new Date() : null,
     });
 
     res.status(201).json({
       success: true,
-      message: isAdminPoster
+      message: isAutoApproved
         ? 'Job created and published successfully'
         : 'Job submitted successfully. It will be visible once approved by an admin.',
       data: job,
