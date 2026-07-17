@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Skill = require('../models/Skill');
 const Post = require('../models/Post');
+const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
@@ -695,8 +696,9 @@ exports.editVendorProfile = async (req, res) => {
       if (req.files.gstCertificate) user.gstCertificate = req.files.gstCertificate[0].path;
     }
 
-    if (!user.panCardImage) return res.status(400).json({ success: false, message: 'PanCard image is required' });
-    if (!user.gstCertificate) return res.status(400).json({ success: false, message: 'GST Certificate image is required' });
+    // Note: PAN/GST images are required at profile CREATION (createVendorProfile),
+    // not on every edit — a vendor editing e.g. just their name shouldn't be
+    // blocked because those docs aren't being re-uploaded in this request.
 
     await user.save();
     const savedUser = await User.findById(req.user.id);
@@ -705,6 +707,157 @@ exports.editVendorProfile = async (req, res) => {
       success: true,
       message: 'Vendor profile updated successfully',
       user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  CHANGE PHONE NUMBER — OTP-gated (any authenticated user/role)
+// ═══════════════════════════════════════════════════════════════════
+// `phone` is only overwritten once the OTP sent to the NEW number is
+// verified — the new number is staged in `pendingPhone` until then.
+
+// @desc    Send OTP to a new phone number to start a phone-change
+// @route   POST /api/profile/phone/send-otp
+// @access  Private
+exports.sendPhoneChangeOtp = async (req, res) => {
+  try {
+    const { newPhone } = req.body;
+
+    if (!newPhone || !/^[6-9]\d{9}$/.test(newPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit phone number',
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.phone === newPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is already your current phone number',
+      });
+    }
+
+    const existing = await User.findOne({ phone: newPhone });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: 'This phone number is already registered with another account',
+      });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const otp = isProduction ? generateOTP() : '123456';
+
+    user.pendingPhone = newPhone;
+    user.otp = otp;
+    user.otpExpire = getOTPExpiry();
+    user.otpAttempts = 0;
+    await user.save();
+
+    if (!isProduction) console.log(`[DEV ONLY] Phone-change OTP for +91${newPhone}: ${otp}`);
+
+    // TODO: send `otp` via a real SMS provider in production.
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to +91' + newPhone,
+      data: { newPhone, expiresIn: '10 minutes', ...(isProduction ? {} : { otp }) },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify OTP and apply the pending phone-number change
+// @route   POST /api/profile/phone/verify-otp
+// @access  Private
+exports.verifyPhoneChangeOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'Please provide the OTP' });
+    }
+
+    const user = await User.findById(req.user.id)
+      .select('+otp +otpExpire +otpAttempts +pendingPhone');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.pendingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'No phone number change in progress. Please request an OTP first.',
+      });
+    }
+
+    if (user.otp !== otp) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      await user.save();
+
+      if (user.otpAttempts >= 3) {
+        user.otp = undefined;
+        user.otpExpire = undefined;
+        user.otpAttempts = 0;
+        user.pendingPhone = undefined;
+        await user.save();
+
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum OTP attempts reached. Please request a new OTP.',
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP. ${3 - user.otpAttempts} attempts remaining.`,
+      });
+    }
+
+    if (!user.otpExpire || user.otpExpire < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new one.',
+      });
+    }
+
+    // Re-check uniqueness right before committing — guards against a race
+    // where someone else claimed the number during the OTP round-trip.
+    const clash = await User.findOne({
+      phone: user.pendingPhone,
+      _id: { $ne: user._id },
+    });
+    if (clash) {
+      user.pendingPhone = undefined;
+      user.otp = undefined;
+      user.otpExpire = undefined;
+      user.otpAttempts = 0;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: 'This phone number is already registered with another account',
+      });
+    }
+
+    user.phone = user.pendingPhone;
+    user.isPhoneVerified = true;
+    user.pendingPhone = undefined;
+    user.otp = undefined;
+    user.otpExpire = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone number updated successfully',
+      data: { phone: user.phone },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -18,6 +18,13 @@ const userSchema = new mongoose.Schema({
     ],
     default: undefined,
   },
+  // Staged new phone number while an OTP-verified change is in progress —
+  // `phone` itself is only overwritten once the OTP for this is confirmed.
+  pendingPhone: {
+    type: String,
+    select: false,
+    default: null,
+  },
   email: {
     type: String,
     unique: true,

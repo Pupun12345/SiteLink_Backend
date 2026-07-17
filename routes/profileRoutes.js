@@ -1,7 +1,9 @@
 const express = require('express');
+const { body } = require('express-validator');
 const upload = require('../middleware/upload');
 const { handleUpload } = require('../middleware/upload');
 const { protect } = require('../middleware/auth');
+const { otpRequestLimiter, authLimiter } = require('../middleware/rateLimiter');
 const {
   getProfile,
   changePassword,
@@ -14,10 +16,20 @@ const {
   getStates,
   getCitiesByState,
   getSkills,
-  languages
+  languages,
+  sendPhoneChangeOtp,
+  verifyPhoneChangeOtp,
 } = require('../controllers/profileController');
 
 const router = express.Router();
+
+const newPhoneValidation = body('newPhone')
+  .matches(/^[6-9]\d{9}$/)
+  .withMessage('Please provide a valid 10-digit phone number');
+
+const otpValidation = body('otp')
+  .isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
+  .isNumeric().withMessage('OTP must contain only numbers');
 
 const customerUpload = upload.fields([
   { name: 'profileImage', maxCount: 1 },
@@ -56,5 +68,9 @@ router.post('/create/vendor', protect, handleUpload(vendorUpload), createVendorP
 // Edit profile
 router.put('/edit/worker', protect, handleUpload(workerUpload), editWorkerProfile);
 router.put('/edit/vendor', protect, handleUpload(vendorUpload), editVendorProfile);
+
+// Change phone number — OTP-gated (any role)
+router.post('/phone/send-otp', protect, otpRequestLimiter, [newPhoneValidation], sendPhoneChangeOtp);
+router.post('/phone/verify-otp', protect, authLimiter, [otpValidation], verifyPhoneChangeOtp);
 
 module.exports = router;
