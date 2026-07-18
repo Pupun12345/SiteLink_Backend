@@ -31,6 +31,14 @@ const planDetailsSchema = new mongoose.Schema({
         type: [String],
         default: [],
     },
+    // Total workers a vendor on this plan can post across ALL their jobs.
+    // Admin-managed / dynamic. 0 = limit not configured (worker-count cap
+    // off; only the active-subscription gate applies).
+    maxWorkers: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     isActive: {
         type: Boolean,
         default: true,

@@ -4,7 +4,19 @@ const Application = require('../models/Application');
 const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
 const Amenity = require('../models/amenities');
+const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
+
+// Total workers a vendor has already committed across their jobs. Deactivated
+// jobs still count (so delete+repost can't bypass the quota); only admin-
+// rejected jobs are excluded. `quantity` is stored as a string, so convert.
+async function _workersUsed(vendorId) {
+  const agg = await Job.aggregate([
+    { $match: { postedBy: new mongoose.Types.ObjectId(vendorId), approvalStatus: { $ne: 'rejected' } } },
+    { $group: { _id: null, total: { $sum: { $convert: { input: '$quantity', to: 'int', onError: 0, onNull: 0 } } } } },
+  ]);
+  return agg.length ? agg[0].total : 0;
+}
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -30,6 +42,7 @@ function _formatJobSummary(job) {
     applicationsCount: job.applicationsCount || 0,
     status: job.status,
     approvalStatus: job.approvalStatus,
+    isActive: job.isActive !== false, // false = vendor ne deactivate kiya
     postedAt: job.createdAt,
     postedBy: {
       id: job.postedBy?._id,
@@ -50,7 +63,9 @@ exports.getJobs = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    let filter = { "approvalStatus": "approved" };
+    // Deactivated jobs (vendor ne delete/deactivate kiye) discovery me nahi
+    // dikhne chahiye — sirf approved + active.
+    let filter = { "approvalStatus": "approved", "isActive": { $ne: false } };
 
     if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
 
@@ -140,10 +155,37 @@ exports.getMyJobs = async (req, res) => {
       rejectionReason: job.rejectionReason || null,
     }));
 
+    // Worker quota summary — vendor ko dikhane ke liye (kitne use kiye / bache).
+    let quota = null;
+    if (req.user.userType === 'vendor') {
+      const now = new Date();
+      const hasActiveSub = req.user.subscriptionStatus === 'active'
+        && req.user.subscriptionExpiresAt
+        && new Date(req.user.subscriptionExpiresAt) > now;
+
+      let maxWorkers = 0;
+      if (hasActiveSub && req.user.activePlan) {
+        const plan = await PlanDetails.findById(req.user.activePlan).select('maxWorkers planName');
+        maxWorkers = Number(plan?.maxWorkers) || 0;
+      }
+
+      const used = jobs
+        .filter((j) => j.approvalStatus !== 'rejected')
+        .reduce((sum, j) => sum + (parseInt(j.quantity, 10) || 0), 0);
+
+      quota = {
+        hasActiveSubscription: hasActiveSub,
+        maxWorkers,
+        used,
+        remaining: maxWorkers > 0 ? Math.max(maxWorkers - used, 0) : null,
+      };
+    }
+
     res.status(200).json({
       success: true,
       count: data.length,
       data,
+      quota,
     });
   } catch (error) {
     res.status(500).json({
@@ -448,6 +490,43 @@ exports.createJob = async (req, res) => {
       });
     }
 
+    // ── Subscription gate + worker quota (vendors only; admin exempt) ──
+    if (user.userType === 'vendor') {
+      const now = new Date();
+      const hasActiveSub = user.subscriptionStatus === 'active'
+        && user.subscriptionExpiresAt
+        && new Date(user.subscriptionExpiresAt) > now;
+
+      if (!hasActiveSub || !user.activePlan) {
+        return res.status(403).json({
+          success: false,
+          code: 'SUBSCRIPTION_REQUIRED',
+          message: 'An active subscription is required to post jobs. Please subscribe to a plan.',
+        });
+      }
+
+      const plan = await PlanDetails.findById(user.activePlan);
+      const maxWorkers = Number(plan?.maxWorkers) || 0;
+
+      // Worker-count cap sirf tab lagti hai jab admin ne plan par maxWorkers
+      // set kiya ho (> 0). Deactivated jobs bhi count hote hain.
+      if (maxWorkers > 0) {
+        const used = await _workersUsed(user._id);
+        const remaining = maxWorkers - used;
+
+        if (workersNeeded > remaining) {
+          return res.status(403).json({
+            success: false,
+            code: 'WORKER_QUOTA_EXCEEDED',
+            message: remaining <= 0
+              ? `You've reached your plan limit of ${maxWorkers} workers. Upgrade your plan to post more.`
+              : `Your plan allows ${maxWorkers} workers in total. Only ${remaining} left — you can't post ${workersNeeded} in this job.`,
+            data: { maxWorkers, used, remaining },
+          });
+        }
+      }
+    }
+
     // Admin- and vendor-posted jobs go live immediately; other roles need admin approval.
     const isAutoApproved = user.userType === 'admin' || user.userType === 'vendor';
 
@@ -717,9 +796,14 @@ exports.deleteJob = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Unauthorized to delete this job' });
     }
 
-    await Job.findByIdAndDelete(id);
+    // Soft-deactivate instead of hard delete: job public discovery se hat
+    // jaata hai lekin vendor ki quota me count hota rehta hai (delete karke
+    // dobara post karke worker-limit bypass nahi kar sakte).
+    job.isActive = false;
+    job.status = 'Closed';
+    await job.save();
 
-    res.status(200).json({ success: true, message: 'Job deleted successfully' });
+    res.status(200).json({ success: true, message: 'Job deactivated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete job', error: error.message });
   }
