@@ -32,8 +32,8 @@ router.get('/my', protect, getMyJobs);
 // GET jobs awaiting approval (admin only) — must come before '/:id'
 router.get('/admin/pending', protect, requireAdmin, getPendingJobs);
 
-// GET single job
-router.get('/:id', getJobDetailsById);
+// GET single job (protected — vendor contact gating needs req.user)
+router.get('/:id', protect, getJobDetailsById);
 
 // POST apply to job (protected)
 router.post('/:id/apply', protect,applicable, applyToJob);

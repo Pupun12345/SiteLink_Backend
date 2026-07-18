@@ -268,7 +268,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -276,6 +276,26 @@ exports.getJobDetailsById = async (req, res) => {
         success: false,
         message: 'Job not found',
       });
+    }
+
+    // Vendor ka phone/WhatsApp sirf tabhi bhejo jab is worker ki application
+    // confirm/hire ho chuki ho — pending/shortlisted/rejected me contact
+    // leak nahi hona chahiye. Vendor khud apna job dekh raha ho to bhi allowed.
+    let contactUnlocked = false;
+    if (req.user?.userType === 'worker') {
+      const confirmedApplication = await Application.findOne({
+        job: id,
+        applicant: req.user.id,
+        status: { $in: ['confirmed', 'hired'] },
+      }).select('_id');
+      contactUnlocked = !!confirmedApplication;
+    } else if (job.postedBy && req.user?.id) {
+      contactUnlocked = job.postedBy._id?.toString() === req.user.id;
+    }
+
+    if (job.postedBy && !contactUnlocked) {
+      delete job.postedBy.phone;
+      delete job.postedBy.whatsappNumber;
     }
 
     res.status(200).json({
