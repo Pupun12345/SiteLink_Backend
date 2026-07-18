@@ -1,6 +1,7 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+const notifyUser = require('../utils/notifyUser');
 
 // @desc    Get community feed (posts + jobs merged)
 // @route   GET /api/community/feed
@@ -278,6 +279,15 @@ exports.addComment = async (req, res) => {
 
     await newComment.populate('userId', 'name profileImage userType verificationStatus');
 
+    // Post owner ko notify karo — apne hi post par comment karne par nahi.
+    if (post.postedBy && post.postedBy.toString() !== userId) {
+      notifyUser(post.postedBy, {
+        type: 'new_comment',
+        title: 'New Comment',
+        body: `${newComment.userId.name || 'Someone'} commented on your post.`,
+        data: { postId: post._id, commentId: newComment._id },
+      }).catch((e) => console.error('[addComment] notifyUser failed:', e.message));
+    }
 
     const responseData = {
       _id: newComment._id,

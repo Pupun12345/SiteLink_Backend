@@ -4,6 +4,7 @@ const Application = require('../models/Application');
 const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
 const Amenity = require('../models/amenities');
+const notifyUser = require('../utils/notifyUser');
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -230,6 +231,13 @@ exports.applyToJob = async (req, res) => {
     await Job.updateOne({ _id: jobId }, { $inc: { applicationsCount: 1 } });
 
     await application.populate('applicant', 'name profileImage userType');
+
+    notifyUser(job.postedBy, {
+      type: 'new_application',
+      title: 'New Application',
+      body: `${user.name || 'A worker'} applied to your job "${job.title}".`,
+      data: { jobId: job._id, applicationId: application._id },
+    }).catch((e) => console.error('[applyToJob] notifyUser failed:', e.message));
 
     res.status(201).json({
       success: true,
@@ -740,6 +748,13 @@ exports.approveJob = async (req, res) => {
     job.rejectionReason = null;
     await job.save();
 
+    notifyUser(job.postedBy, {
+      type: 'job_approved',
+      title: 'Job Approved',
+      body: `Your job "${job.title}" has been approved and is now live.`,
+      data: { jobId: job._id },
+    }).catch((e) => console.error('[approveJob] notifyUser failed:', e.message));
+
     res.status(200).json({
       success: true,
       message: 'Job approved successfully',
@@ -772,6 +787,15 @@ exports.rejectJob = async (req, res) => {
     job.approvedAt = new Date();
     job.rejectionReason = reason || null;
     await job.save();
+
+    notifyUser(job.postedBy, {
+      type: 'job_rejected',
+      title: 'Job Rejected',
+      body: reason
+        ? `Your job "${job.title}" was rejected: ${reason}`
+        : `Your job "${job.title}" was rejected.`,
+      data: { jobId: job._id },
+    }).catch((e) => console.error('[rejectJob] notifyUser failed:', e.message));
 
     res.status(200).json({
       success: true,
@@ -864,7 +888,7 @@ exports.updateApplicantStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid Job ID or Application ID' });
     }
 
-    const job = await Job.findById(id).select('postedBy');
+    const job = await Job.findById(id).select('postedBy title');
     if (!job) {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
@@ -882,6 +906,13 @@ exports.updateApplicantStatus = async (req, res) => {
 
     application.status = status;
     await application.save();
+
+    notifyUser(application.applicant, {
+      type: 'application_status',
+      title: 'Application Update',
+      body: `Your application for "${job.title}" is now ${status}.`,
+      data: { jobId: job._id, applicationId: application._id, status },
+    }).catch((e) => console.error('[updateApplicantStatus] notifyUser failed:', e.message));
 
     res.status(200).json({
       success: true,

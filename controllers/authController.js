@@ -4,6 +4,7 @@ const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
 const admin = require('../config/firebase');
+const notifyUser = require('../utils/notifyUser');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -453,6 +454,12 @@ exports.verifyVendor = async (req, res, next) => {
     user.verificationRejectedReason = null;
     await user.save();
 
+    notifyUser(user._id, {
+      type: 'vendor_verified',
+      title: 'Account Verified',
+      body: 'Your vendor account has been verified. You can now post jobs.',
+    }).catch((e) => console.error('[verifyVendor] notifyUser failed:', e.message));
+
     res.status(200).json({
       success: true,
       message: 'Vendor verified successfully',
@@ -482,6 +489,14 @@ exports.rejectVendor = async (req, res, next) => {
     user.verificationReviewedAt = new Date();
     user.verificationRejectedReason = reason || null;
     await user.save();
+
+    notifyUser(user._id, {
+      type: 'vendor_rejected',
+      title: 'Verification Rejected',
+      body: reason
+        ? `Your vendor verification was rejected: ${reason}`
+        : 'Your vendor verification was rejected.',
+    }).catch((e) => console.error('[rejectVendor] notifyUser failed:', e.message));
 
     res.status(200).json({
       success: true,
