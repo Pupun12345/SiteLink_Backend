@@ -5,10 +5,6 @@ const {
   createPost,
   likeUnlikePost,
   deletePost,
-  getPendingPosts,
-  approvePost,
-  rejectPost,
-  autoApprovePosts,
   addComment,
   updateComment,
   deleteComment,
@@ -34,6 +30,6 @@ router.delete('/posts/:postId', protect, deletePost);
 router.post('/posts/:id/comments', protect, addComment);
 router.put('/posts/:postId/comments/:commentId', protect, updateComment);
 router.delete('/posts/:postId/comments/:commentId', protect, deleteComment);
-router.get('/posts/:id/comments', getCommentsByPost);
+router.get('/posts/:id/comments', protect, getCommentsByPost);
 
 module.exports = router;

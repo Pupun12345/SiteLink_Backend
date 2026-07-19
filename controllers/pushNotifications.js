@@ -27,6 +27,13 @@ exports.sendPushNotification = async (req, res) => {
   try {
     const { userId, title, message } = req.body;
 
+    if (!userId || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, title and message are required",
+      });
+    }
+
     const user = await User.findById(userId);
 
     if (!user) {
@@ -36,18 +43,13 @@ exports.sendPushNotification = async (req, res) => {
       });
     }
 
-    if (!user.fcmToken) {
-      return res.status(404).json({
-        success: false,
-        message: "FCM token not registered",
-      });
-    }
-
-    await sendNotification(user.fcmToken, title, message);
+    // notifyUser: in-app history me record + best-effort FCM push — admin ki
+    // bheji notification bhi user ke Alerts tab me dikhni chahiye.
+    await notifyUser(userId, { title, body: message, type: 'general' });
 
     res.status(200).json({
       success: true,
-      message: "Push notification sent",
+      message: "Notification sent",
     });
   } catch (error) {
     res.status(500).json({

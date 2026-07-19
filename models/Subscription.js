@@ -24,16 +24,12 @@ const subscriptionSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  // Plan pricing is admin-managed (PlanDetails.amount) and can change, so
+  // this just guards against a bad/negative value rather than a fixed price.
   amount: {
     type: Number,
     required: true,
-    validate: {
-      validator: function (v) {
-        const allowed = { vendor_basic: 2999, vendor_premium: 4999, worker: 99 };
-        return allowed[this.plan] === v;
-      },
-      message: props => `Amount must be ₹2999 for vendor_basic, ₹4999 for vendor_premium, or ₹99 for worker`
-    }
+    min: 0,
   },
 }, {
   timestamps: true,

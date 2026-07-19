@@ -3,6 +3,15 @@ const mongoose = require('mongoose');
 const PlanDetails = require('../models/PlanDetails');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
+const Subscription = require('../models/Subscription');
+
+// PlanDetails (userType + planType) -> Subscription.plan enum.
+function subscriptionPlanKey(plan) {
+  if (plan.userType === 'vendor') {
+    return plan.planType === 'premium' ? 'vendor_premium' : 'vendor_basic';
+  }
+  return 'worker';
+}
 
 const RAZORPAY_BASE = 'https://api.razorpay.com/v1';
 
@@ -151,7 +160,19 @@ exports.verifyPayment = async (req, res) => {
       expiry.setMonth(expiry.getMonth() + 1); // default: monthly
     }
 
+    // Admin panel's revenue/subscription views read from the Subscription
+    // collection — record one here so a real payment actually shows up there.
+    const subscription = await Subscription.create({
+      user: user._id,
+      plan: subscriptionPlanKey(plan),
+      status: 'active',
+      startDate: now,
+      endDate: expiry,
+      amount: plan.amount,
+    });
+
     user.activePlan = plan._id;
+    user.subscriptionId = subscription._id;
     user.subscriptionStatus = 'active';
     user.subscriptionExpiresAt = expiry;
     user.lastPaymentId = razorpay_payment_id;
