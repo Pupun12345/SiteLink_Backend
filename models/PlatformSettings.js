@@ -19,6 +19,15 @@ const platformSettingsSchema = new mongoose.Schema({
     }
   },
   language: { type: String, default: 'English (United States)' },
+  supportContact: {
+    phone: { type: String, default: '' },
+    whatsapp: { type: String, default: '' },
+    email: { type: String, default: '' },
+    hoursWeekday: { type: String, default: '' },
+    hoursSunday: { type: String, default: '' },
+    emergencyNote: { type: String, default: '' },
+    avgResponseTime: { type: String, default: '' },
+  },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedAt: { type: Date, default: Date.now }
 }, {
