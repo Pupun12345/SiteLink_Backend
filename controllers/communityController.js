@@ -69,6 +69,70 @@ exports.getCommunityFeed = async (req, res) => {
 };
 
 
+// @desc    Get the current user's own posts (any approvalStatus/isActive —
+//          owner should always see their own content, not just what's
+//          currently live in the public feed)
+// @route   GET /api/community/posts/mine
+// @access  Private
+exports.getMyPosts = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const filter = { postedBy: req.user.id };
+
+    const [posts, total] = await Promise.all([
+      Post.find(filter)
+        .populate('likes.userId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments(filter),
+    ]);
+
+    const formattedPosts = posts.map((post) => ({
+      type: 'post',
+      _id: post._id,
+      content: post.content,
+      images: post.images,
+      video: post.video,
+      feeling: post.feeling,
+      posterName: post.posterName,
+      posterImage: post.posterImage,
+      posterType: post.posterType,
+      companyName: post.companyName,
+      verification: post.verification,
+      approvalStatus: post.approvalStatus,
+      isActive: post.isActive,
+      likesCount: post.likesCount,
+      commentsCount: post.commentsCount,
+      createdAt: post.createdAt,
+      likes: (post.likes || []).map((like) => ({
+        userId: like.userId?._id,
+        userName: like.userId?.name,
+      })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedPosts,
+      pagination: {
+        current: page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching your posts',
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Create a community post
 // @route   POST /api/community/posts
 // @access  Private

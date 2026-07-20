@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getCommunityFeed,
+  getMyPosts,
   createPost,
   likeUnlikePost,
   deletePost,
@@ -16,6 +17,9 @@ const { handleUpload } = require('../middleware/upload');
 
 // GET community feed
 router.get('/feed', protect, getCommunityFeed);
+
+// GET current user's own posts (must come before '/posts/:id...' routes)
+router.get('/posts/mine', protect, getMyPosts);
 
 // POST create post
 router.post('/posts', protect, handleUpload(upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }])), createPost);

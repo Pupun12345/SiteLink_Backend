@@ -1,6 +1,5 @@
 const User = require('../models/User');
 const Skill = require('../models/Skill');
-const Post = require('../models/Post');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 
 const STATES = [
@@ -168,8 +167,8 @@ exports.getProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const Posts = await Post.find({ postedBy: regularUser._id }).sort({ createdAt: -1 });
-
+    // Own posts have their own dedicated, paginated endpoint now
+    // (GET /api/community/posts/mine) — not embedded here anymore.
     const user = regularUser.userType === 'worker'
       ? {
         id: regularUser._id,
@@ -179,7 +178,6 @@ exports.getProfile = async (req, res) => {
         profileImage: regularUser.profileImage,
         primarySkill: regularUser.primarySkill,
         skills: regularUser.skills,
-        posts: Posts,
         workCity: regularUser.city,
         workState: regularUser.workState,
         userType: regularUser.userType,
