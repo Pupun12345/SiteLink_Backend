@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Skill = require('../models/Skill');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
+const notifyUser = require('../utils/notifyUser');
 
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
@@ -851,6 +852,15 @@ exports.verifyPhoneChangeOtp = async (req, res) => {
     user.otpExpire = undefined;
     user.otpAttempts = 0;
     await user.save();
+
+    // Security-style heads-up — user ko pata chale agar unka number kisi
+    // aur ne (ya khud unhone) change kiya.
+    notifyUser(user._id, {
+      type: 'phone_changed',
+      title: 'Phone Number Updated',
+      body: `Your account phone number was changed to ${user.phone}.`,
+      data: {},
+    }).catch((e) => console.error('[verifyPhoneChangeOtp] notifyUser failed:', e.message));
 
     res.status(200).json({
       success: true,

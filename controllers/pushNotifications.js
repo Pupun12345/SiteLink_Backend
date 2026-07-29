@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const sendNotification = require("../utils/sendNotification");
+const notifyUser = require("../utils/notifyUser");
 const mongoose = require("mongoose");
 
 exports.saveFcmToken = async (req, res) => {
@@ -23,40 +24,58 @@ exports.saveFcmToken = async (req, res) => {
   }
 };
 
+// @desc  Admin sends a push — either to one specific user (userId) or a
+// whole role at once (role: 'worker' | 'vendor' | 'all'). Each recipient
+// gets their own in-app Notification record + best-effort FCM push via
+// notifyUser (same pipeline every other trigger in this app uses).
 exports.sendPushNotification = async (req, res) => {
   try {
-    const { userId, title, message } = req.body;
+    const { userId, role, title, message } = req.body;
 
-    if (!userId || !title || !message) {
+    if (!title || !message) {
       return res.status(400).json({
         success: false,
-        message: "userId, title and message are required",
+        message: "title and message are required",
       });
     }
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
+    if (!userId && !role) {
+      return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "Either userId or role is required",
       });
     }
 
-    // notifyUser: in-app history me record + best-effort FCM push — admin ki
-    // bheji notification bhi user ke Alerts tab me dikhni chahiye.
-    await notifyUser(userId, { title, body: message, type: 'general' });
+    let recipientIds = [];
+
+    if (userId) {
+      const user = await User.findById(userId).select('_id');
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+      recipientIds = [user._id];
+    } else {
+      const query = role === 'all' ? {} : { userType: role };
+      const users = await User.find(query).select('_id');
+      recipientIds = users.map((u) => u._id);
+    }
+
+    await Promise.all(
+      recipientIds.map((id) =>
+        notifyUser(id, { title, body: message, type: 'general' })
+      )
+    );
 
     res.status(200).json({
       success: true,
-      message: "Notification sent",
+      message: `Notification sent to ${recipientIds.length} user(s)`,
+      recipientCount: recipientIds.length,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
     });
-  };
+  }
 };
 
 // ═══════════════════════════════════════════════════════════════════

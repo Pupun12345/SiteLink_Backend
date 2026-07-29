@@ -803,6 +803,23 @@ exports.deleteJob = async (req, res) => {
     job.status = 'Closed';
     await job.save();
 
+    // Jinke applications abhi bhi pending/shortlisted the unhe batao ki job
+    // band ho gayi — already confirmed/hired/rejected workers ko spam nahi.
+    const affected = await Application.find({
+      job: job._id,
+      status: { $in: ['pending', 'shortlisted'] },
+    }).select('applicant');
+    await Promise.all(
+      affected.map((a) =>
+        notifyUser(a.applicant, {
+          title: 'Job Closed',
+          body: `"${job.title}" has been closed by the vendor.`,
+          type: 'job_closed',
+          data: { jobId: job._id.toString() },
+        })
+      )
+    );
+
     res.status(200).json({ success: true, message: 'Job deactivated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete job', error: error.message });

@@ -209,7 +209,7 @@ exports.likeUnlikePost = async (req, res) => {
     const { postId } = req.params;
     const userId = req.user._id;
 
-    const post = await Post.findById(postId).select('likes');
+    const post = await Post.findById(postId).select('likes postedBy');
 
     if (!post) {
       return res.status(404).json({
@@ -226,6 +226,18 @@ exports.likeUnlikePost = async (req, res) => {
         ? { $pull: { likes: { userId } }, $inc: { likesCount: -1 } }
         : { $push: { likes: { userId, likedAt: new Date() } }, $inc: { likesCount: 1 } }
     );
+
+    // Post owner ko sirf naye like par notify karo (unlike par nahi), apne
+    // hi post par like karne par bhi nahi.
+    if (!alreadyLiked && post.postedBy && post.postedBy.toString() !== userId.toString()) {
+      const liker = await User.findById(userId).select('name');
+      notifyUser(post.postedBy, {
+        type: 'new_like',
+        title: 'New Like',
+        body: `${liker?.name || 'Someone'} liked your post.`,
+        data: { postId: post._id.toString() },
+      }).catch((e) => console.error('[likeUnlikePost] notifyUser failed:', e.message));
+    }
 
     const updatedPost = await Post.findById(postId)
       .populate('postedBy', 'name profileImage')

@@ -4,6 +4,7 @@ const PlanDetails = require('../models/PlanDetails');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Subscription = require('../models/Subscription');
+const notifyUser = require('../utils/notifyUser');
 
 // PlanDetails (userType + planType) -> Subscription.plan enum.
 function subscriptionPlanKey(plan) {
@@ -183,6 +184,13 @@ exports.verifyPayment = async (req, res) => {
       { orderId: razorpay_order_id },
       { status: 'paid', paymentId: razorpay_payment_id, signature: razorpay_signature }
     );
+
+    notifyUser(user._id, {
+      type: 'subscription_activated',
+      title: 'Subscription Activated',
+      body: `Your ${plan.planName} plan is now active, valid till ${expiry.toDateString()}.`,
+      data: { planId: plan._id.toString(), expiryDate: expiry.toISOString() },
+    }).catch((e) => console.error('[verifyPayment] notifyUser failed:', e.message));
 
     res.status(200).json({
       success: true,
