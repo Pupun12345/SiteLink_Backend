@@ -19,10 +19,11 @@ const {
   rejectJob,
   getMyJobs,
 } = require('../controllers/jobsController');
-const { protect, applicable, requireAdmin } = require('../middleware/auth');
+const { protect, optionalAuth, applicable, requireAdmin } = require('../middleware/auth');
 
-// GET all jobs
-router.get('/', getJobs);
+// GET all jobs (public browse, but optionalAuth lets us mark applied jobs
+// for a logged-in worker without requiring login to browse)
+router.get('/', optionalAuth, getJobs);
 
 router.get("/getAppliedJobs", protect, appliedJobs);
 

@@ -23,7 +23,10 @@ function escapeRegex(str) {
 }
 
 // Helper: shape a Job document into the summary object used by list endpoints.
-function _formatJobSummary(job) {
+// `applicationStatus` (pending/shortlisted/confirmed/rejected/hired/null) —
+// the requesting worker's own Application.status for this job, if any —
+// lets the browse list mark jobs already applied to (see getJobs below).
+function _formatJobSummary(job, applicationStatus = null) {
   return {
     _id: job._id,
     title: job.title,
@@ -44,6 +47,8 @@ function _formatJobSummary(job) {
     approvalStatus: job.approvalStatus,
     isActive: job.isActive !== false, // false = vendor ne deactivate kiya
     postedAt: job.createdAt,
+    hasApplied: !!applicationStatus,
+    applicationStatus: applicationStatus || null,
     postedBy: {
       id: job.postedBy?._id,
       name: job.postedBy?.name,
@@ -117,7 +122,23 @@ exports.getJobs = async (req, res) => {
       Job.countDocuments(filter),
     ]);
 
-    const data = jobs.map(_formatJobSummary);
+    // Worker logged in? Mark jobs already applied to (any status) so the
+    // browse list can show "Applied" instead of "Apply" for them.
+    let appliedStatusByJob = {};
+    if (req.user?.userType === 'worker' && jobs.length) {
+      const apps = await Application.find({
+        applicant: req.user.id,
+        job: { $in: jobs.map((j) => j._id) },
+      }).select('job status').lean();
+      appliedStatusByJob = apps.reduce((acc, a) => {
+        acc[a.job.toString()] = a.status;
+        return acc;
+      }, {});
+    }
+
+    const data = jobs.map((job) =>
+      _formatJobSummary(job, appliedStatusByJob[job._id.toString()] || null)
+    );
 
     res.status(200).json({
       success: true,
@@ -324,13 +345,14 @@ exports.getJobDetailsById = async (req, res) => {
     // confirm/hire ho chuki ho — pending/shortlisted/rejected me contact
     // leak nahi hona chahiye. Vendor khud apna job dekh raha ho to bhi allowed.
     let contactUnlocked = false;
+    let applicationStatus = null;
     if (req.user?.userType === 'worker') {
-      const confirmedApplication = await Application.findOne({
+      const myApplication = await Application.findOne({
         job: id,
         applicant: req.user.id,
-        status: { $in: ['confirmed', 'hired'] },
-      }).select('_id');
-      contactUnlocked = !!confirmedApplication;
+      }).select('status');
+      applicationStatus = myApplication?.status || null;
+      contactUnlocked = ['confirmed', 'hired'].includes(applicationStatus);
     } else if (job.postedBy && req.user?.id) {
       contactUnlocked = job.postedBy._id?.toString() === req.user.id;
     }
@@ -339,6 +361,9 @@ exports.getJobDetailsById = async (req, res) => {
       delete job.postedBy.phone;
       delete job.postedBy.whatsappNumber;
     }
+
+    job.hasApplied = !!applicationStatus;
+    job.applicationStatus = applicationStatus;
 
     res.status(200).json({
       success: true,

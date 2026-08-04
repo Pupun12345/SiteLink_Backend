@@ -63,6 +63,38 @@ exports.protect = async (req, res, next) => {
 };
 
 
+// Same as `protect` but never blocks the request — decodes the token if
+// present/valid and sets req.user, otherwise proceeds as anonymous. Used on
+// routes that are publicly browsable but want to personalize the response
+// (e.g. GET /api/jobs marking which jobs the logged-in worker already applied to).
+exports.optionalAuth = async (req, res, next) => {
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) return next();
+
+  try {
+    const blacklisted = await BlacklistedToken.findOne({ token });
+    if (blacklisted) return next();
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (user && !user.isBlocked) {
+      req.user = user;
+    }
+  } catch (error) {
+    // Invalid/expired token — proceed as anonymous, don't block browsing.
+  }
+
+  next();
+};
+
 // Authorize specific roles
 exports.authorize = (...roles) => {
   return (req, res, next) => {
