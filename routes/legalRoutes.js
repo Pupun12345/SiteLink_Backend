@@ -4,7 +4,11 @@ const { getAllPolicies, getSupportContact } = require('../controllers/legalContr
 const { protect } = require('../middleware/auth');
 
 
-router.get('/policies', protect, getAllPolicies);
+// Public — Terms/Privacy signup se PEHLE padhne milne chahiye (login screen
+// ka "By continuing you agree to..." wahi se khulta hai), aur Play Store bhi
+// publicly accessible privacy policy maangta hai.
+router.get('/policies', getAllPolicies);
+
 router.get('/support-contact', protect, getSupportContact);
 
 module.exports = router;

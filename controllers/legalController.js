@@ -5,9 +5,11 @@ const PlatformSettings = require('../models/PlatformSettings')
 // Get all policies — all versions of all types (Admin)
 exports.getAllPolicies = async (req, res) => {
   try {
-    const policies = await LegalPolicy.find({isActive: true})
-      .populate('createdBy', 'name email')
-      .populate('lastUpdatedBy', 'name email')
+    // Public endpoint — sirf wahi fields bhejo jo app ko chahiye.
+    // createdBy/lastUpdatedBy populate NAHI karte, warna admin ka
+    // naam+email publicly expose ho jaata.
+    const policies = await LegalPolicy.find({ isActive: true })
+      .select('policyType title content version updatedAt')
       .sort({ policyType: 1, version: -1 });
 
     res.status(200).json({ success: true, data: policies });
