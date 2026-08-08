@@ -80,7 +80,9 @@ const userSchema = new mongoose.Schema({
     default: null,
   },
   willingtoRelocate: { type: Boolean, default: false },
-  salaryType: { type: String, enum: ['daily', 'monthly', 'hourly', 'project-based'], default: null },
+  // 'weekly' bhi allowed — worker reg/edit UI aur jobs API dono
+  // daily/weekly/monthly offer karte hain.
+  salaryType: { type: String, enum: ['daily', 'weekly', 'monthly', 'hourly', 'project-based'], default: null },
   salary: { type: Number, default: null },
   governmentID: { type: String, default: null },
   experienceCertificate: { type: String, default: null },

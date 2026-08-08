@@ -185,6 +185,15 @@ exports.getProfile = async (req, res) => {
         createdAt: regularUser.createdAt,
         location: regularUser.location,
         dateOfBirth: regularUser.dateOfBirth,
+        phone: regularUser.phone,
+        // DB me field `experience` hai, par app (create/edit dono me) ise
+        // `totalExperience` naam se bhejti/padhti hai — wahi naam wapas do.
+        totalExperience: regularUser.experience,
+        experienceDescription: regularUser.experienceDescription,
+        gender: regularUser.gender,
+        willingtoRelocate: regularUser.willingtoRelocate,
+        salaryType: regularUser.salaryType,
+        salary: regularUser.salary,
         experienceCertificate: regularUser.experienceCertificate,
         governmentID: regularUser.governmentID,
         workSamplesPhoto: regularUser.workSamplesPhoto,
@@ -352,7 +361,10 @@ exports.createWorkerProfile = async (req, res) => {
         });
       }
 
-      user.gender = gender;
+      // Schema enum capitalized hai ('Male'/'Female'/'Other') par app
+      // lowercase bhejti hai — normalize karo warna save validation fail.
+      user.gender =
+        gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
     }
 
     if (totalExperience !== undefined) {
@@ -524,7 +536,10 @@ exports.editWorkerProfile = async (req, res) => {
         });
       }
 
-      user.gender = gender;
+      // Schema enum capitalized hai ('Male'/'Female'/'Other') par app
+      // lowercase bhejti hai — normalize karo warna save validation fail.
+      user.gender =
+        gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
     }
 
     if (totalExperience !== undefined) {
@@ -546,7 +561,7 @@ exports.editWorkerProfile = async (req, res) => {
     }
 
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
-    if (salaryType) user.salaryType = salaryType;
+    if (salaryType) user.salaryType = salaryType.toLowerCase();
 
     if (salary !== undefined) {
       const parsedSalary = Number(salary);
