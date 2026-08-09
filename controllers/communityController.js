@@ -19,7 +19,10 @@ exports.getCommunityFeed = async (req, res) => {
 
     const [posts, total] = await Promise.all([
       Post.find(filter)
-        .populate("postedBy", "name profileImage")
+        // designation/primarySkill bhi chahiye — purani posts me
+        // posterDesignation snapshot nahi hai, unke liye live profile
+        // se fallback lete hain.
+        .populate("postedBy", "name profileImage designation primarySkill")
         .populate("likes.userId", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -38,6 +41,11 @@ exports.getCommunityFeed = async (req, res) => {
       posterName: post.posterName,
       posterImage: post.posterImage,
       posterType: post.posterType,
+      posterDesignation:
+        post.posterDesignation ||
+        post.postedBy?.designation ||
+        post.postedBy?.primarySkill ||
+        null,
       companyName: post.companyName,
       verification: post.verification,
       likesCount: post.likesCount,
@@ -101,6 +109,12 @@ exports.getMyPosts = async (req, res) => {
       posterName: post.posterName,
       posterImage: post.posterImage,
       posterType: post.posterType,
+      // Apni hi posts hain — purani posts ke liye req.user se fallback.
+      posterDesignation:
+        post.posterDesignation ||
+        req.user?.designation ||
+        req.user?.primarySkill ||
+        null,
       companyName: post.companyName,
       verification: post.verification,
       approvalStatus: post.approvalStatus,
@@ -159,6 +173,8 @@ exports.createPost = async (req, res) => {
       posterName: user.name,
       posterImage: user.profileImage,
       posterType: user.userType,
+      // Vendor ke liye designation, worker ke liye primarySkill
+      posterDesignation: user.designation || user.primarySkill || null,
       companyName: user.companyName || user.ownerName || null,
       images,
       video,
@@ -185,6 +201,7 @@ exports.createPost = async (req, res) => {
         posterName: populatedPost.posterName,
         posterImage: populatedPost.posterImage,
         posterType: populatedPost.posterType,
+        posterDesignation: populatedPost.posterDesignation,
         companyName: populatedPost.companyName,
         verification: populatedPost.verification,
         likesCount: populatedPost.likesCount,
