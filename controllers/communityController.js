@@ -19,10 +19,14 @@ exports.getCommunityFeed = async (req, res) => {
 
     const [posts, total] = await Promise.all([
       Post.find(filter)
-        // designation/primarySkill bhi chahiye — purani posts me
-        // posterDesignation snapshot nahi hai, unke liye live profile
-        // se fallback lete hain.
-        .populate("postedBy", "name profileImage designation primarySkill")
+        // designation/primarySkill/companyName bhi chahiye — purani posts
+        // me ye snapshot nahi hain, unke liye live profile se fallback
+        // lete hain (feed me vendor ka company name aur worker ki skill
+        // dikhani hai, khaali badge nahi).
+        .populate(
+          "postedBy",
+          "name profileImage designation primarySkill companyName"
+        )
         .populate("likes.userId", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -46,7 +50,7 @@ exports.getCommunityFeed = async (req, res) => {
         post.postedBy?.designation ||
         post.postedBy?.primarySkill ||
         null,
-      companyName: post.companyName,
+      companyName: post.companyName || post.postedBy?.companyName || null,
       verification: post.verification,
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
@@ -115,7 +119,7 @@ exports.getMyPosts = async (req, res) => {
         req.user?.designation ||
         req.user?.primarySkill ||
         null,
-      companyName: post.companyName,
+      companyName: post.companyName || req.user?.companyName || null,
       verification: post.verification,
       approvalStatus: post.approvalStatus,
       isActive: post.isActive,
