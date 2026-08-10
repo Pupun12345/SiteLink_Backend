@@ -44,6 +44,14 @@ const postSchema = new mongoose.Schema(
       enum: ['worker', 'vendor', 'admin'],
       required: true,
     },
+    // Feed me name ke neeche 'vendor'/'worker' ki jagah yeh dikhta hai —
+    // vendor ka designation, worker ka primarySkill. Post banate waqt
+    // snapshot le lete hain taaki baad me profile badle to purani post
+    // ka context na badle.
+    posterDesignation: {
+      type: String,
+      default: null,
+    },
     companyName: {
       type: String,
       default: null,
