@@ -37,7 +37,6 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/plans', require('./routes/planRoutes'));
 app.use('/api/amenities', amenityRoutes);
 app.use('/api/payments', require('./routes/paymentRoutes'));
-app.use('/api/app-config', require('./routes/appConfigRoutes'));
 
 // ── Deep link / share ────────────────────────────────────────────────
 // Public hain: WhatsApp ka crawler aur naya user (jiske paas app hi
