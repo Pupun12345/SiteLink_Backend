@@ -1,7 +1,42 @@
+const mongoose = require('mongoose');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
 const notifyUser = require('../utils/notifyUser');
+
+// Feed, myPosts aur single-post — teeno ek hi shape bhejte hain, warna
+// app ko har endpoint ke liye alag parsing likhni padti hai.
+// `postedBy` populated ho to purani posts ke missing snapshots (jaise
+// posterDesignation) live profile se bhar jaate hain.
+function formatPost(post) {
+  const author = post.postedBy && post.postedBy._id ? post.postedBy : null;
+  return {
+    type: 'post',
+    _id: post._id,
+    content: post.content,
+    images: post.images,
+    video: post.video,
+    feeling: post.feeling,
+    posterName: post.posterName,
+    posterImage: post.posterImage,
+    posterType: post.posterType,
+    posterDesignation:
+      post.posterDesignation ||
+      author?.designation ||
+      author?.primarySkill ||
+      null,
+    companyName: post.companyName || author?.companyName || null,
+    verification: post.verification,
+    approvalStatus: post.approvalStatus,
+    likesCount: post.likesCount,
+    commentsCount: post.commentsCount,
+    createdAt: post.createdAt,
+    likes: (post.likes || []).map((like) => ({
+      userId: like.userId?._id,
+      userName: like.userId?.name,
+    })),
+  };
+}
 
 // @desc    Get community feed (posts + jobs merged)
 // @route   GET /api/community/feed
@@ -221,6 +256,54 @@ exports.createPost = async (req, res) => {
   }
 };
 
+
+// @desc    Ek single post — shared link kholne par app isi se post
+//          uthata hai (feed me wo post ho ya na ho, purani bhi ho sakti hai)
+// @route   GET /api/community/posts/:postId
+// @access  Private
+exports.getPostById = async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid post ID' });
+    }
+
+    const post = await Post.findById(postId)
+      .populate(
+        'postedBy',
+        'name profileImage designation primarySkill companyName'
+      )
+      .populate('likes.userId', 'name');
+
+    if (!post) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Post not found' });
+    }
+
+    // Shared link se koi bhi aa sakta hai — jo post feed me nahi hai
+    // (pending/rejected/hataayi hui) wo sirf uske apne malik ko dikhe.
+    const isOwner = post.postedBy?._id?.toString() === req.user.id;
+    const isLive = post.isActive && post.approvalStatus === 'approved';
+    if (!isLive && !isOwner) {
+      return res.status(404).json({
+        success: false,
+        message: 'This post is no longer available',
+      });
+    }
+
+    res.status(200).json({ success: true, data: formatPost(post) });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching post',
+      error: error.message,
+    });
+  }
+};
 
 // @desc    Like/Unlike a post
 // @route   PUT /api/community/posts/:postId/like

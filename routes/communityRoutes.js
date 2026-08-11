@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getCommunityFeed,
   getMyPosts,
+  getPostById,
   createPost,
   likeUnlikePost,
   deletePost,
@@ -20,6 +21,9 @@ router.get('/feed', protect, getCommunityFeed);
 
 // GET current user's own posts (must come before '/posts/:id...' routes)
 router.get('/posts/mine', protect, getMyPosts);
+
+// GET ek single post — shared deep link kholne par app isi ko call karti hai
+router.get('/posts/:postId', protect, getPostById);
 
 // POST create post
 router.post('/posts', protect, handleUpload(upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }])), createPost);

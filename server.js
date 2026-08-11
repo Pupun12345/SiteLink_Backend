@@ -38,6 +38,13 @@ app.use('/api/plans', require('./routes/planRoutes'));
 app.use('/api/amenities', amenityRoutes);
 app.use('/api/payments', require('./routes/paymentRoutes'));
 
+// ── Deep link / share ────────────────────────────────────────────────
+// Public hain: WhatsApp ka crawler aur naya user (jiske paas app hi
+// nahi) dono yahan aate hain, token kisi ke paas nahi hota.
+const { sharePostPage, assetLinks } = require('./controllers/shareController');
+app.get('/p/:postId', sharePostPage);
+app.get('/.well-known/assetlinks.json', assetLinks);
+
 
 
 // Test auth page
