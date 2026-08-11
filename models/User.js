@@ -230,6 +230,36 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // ── Worker performance rating (AUTOMATIC — koi manually nahi deta) ──
+  // Application outcomes se calculate hoti hai (utils/workerRating.js) aur
+  // yahan denormalized rakhi jaati hai, taaki applicant list / job feed
+  // har worker ke liye alag query na kare.
+  // 0 = abhi tak koi job complete nahi ki (naya worker) — UI "New" dikhata
+  // hai, 0.0 stars nahi (warna naya worker "kharaab" lagta hai).
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0,
+  },
+  jobsCompleted: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  // Kitne outcomes par rating bani hai — UI isse "(12 jobs)" dikhata hai
+  // aur user samajh paata hai ki rating kitni bharosemand hai.
+  ratedJobsCount: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  ratingUpdatedAt: {
+    type: Date,
+    default: null,
+  },
+
+  // Admin ka manual rating — alag cheez hai, automatic wali se mat milao.
   adminRating: {
     type: Number,
     min: [1, 'Rating must be at least 1'],

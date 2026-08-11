@@ -14,6 +14,7 @@ const {
   deleteJob,
   getJobApplicants,
   updateApplicantStatus,
+  updateApplicantOutcome,
   getPendingJobs,
   approveJob,
   rejectJob,
@@ -44,6 +45,10 @@ router.get('/:id/applicants', protect, getJobApplicants);
 
 // PUT update an applicant's status (job owner / admin)
 router.put('/:id/applicants/:applicationId/status', protect, updateApplicantStatus);
+
+// Kaam ka outcome (completed / left_early / no_show) — worker ki automatic
+// rating isi se banti hai.
+router.put('/:id/applicants/:applicationId/outcome', protect, updateApplicantOutcome);
 
 // POST create job (protected)
 router.post('/', protect, createJob);

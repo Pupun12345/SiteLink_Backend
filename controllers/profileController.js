@@ -1051,6 +1051,10 @@ exports.getProfile = async (req, res) => {
         totalExperience: regularUser.experience,
         experienceDescription: regularUser.experienceDescription,
         gender: regularUser.gender,
+        // Automatic performance rating (job outcomes se). 0 = naya worker.
+        rating: regularUser.rating || 0,
+        jobsCompleted: regularUser.jobsCompleted || 0,
+        ratedJobsCount: regularUser.ratedJobsCount || 0,
         willingtoRelocate: regularUser.willingtoRelocate,
         salaryType: regularUser.salaryType,
         salary: regularUser.salary,
