@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
+const Job = require('../models/Job');
 
 // ═══════════════════════════════════════════════════════════════════
 //  SHARE / DEEP LINK LANDING
@@ -141,64 +142,125 @@ ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
 </html>`;
 }
 
+/// Post aur Job dono ka landing page bilkul ek jaisa banta hai — sirf
+/// "kya dikhana hai" alag hai. Wahi ek jagah rakh diya taaki kal koi
+/// teesri cheez (worker profile?) share karni ho to sirf ek loader
+/// likhna pade.
+///
+/// [loader] `{ title, description, image }` de ya `null` (mila hi nahi).
+function makeSharePage({ pathPrefix, deepLinkHost, idParam, loader, fallbackDescription }) {
+  return async (req, res) => {
+    const id = req.params[idParam];
+    const webUrl = `${req.protocol}://${req.get('host')}/${pathPrefix}/${id}`;
+    const deepLink = { host: deepLinkHost, path: `/${id}` };
+
+    // Cheez na mile / hata di gayi ho — page phir bhi bhejo (404 JSON
+    // nahi), taaki user ko app/store ka raasta mile.
+    const fallback = {
+      title: 'SiteLink',
+      description: fallbackDescription,
+      image: null,
+      deepLink,
+      webUrl,
+    };
+
+    try {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(404).send(renderPage(fallback));
+      }
+
+      const meta = await loader(id);
+      if (!meta) return res.status(404).send(renderPage(fallback));
+
+      res
+        .status(200)
+        // Crawler ko fresh chahiye par har hit pe DB bhi nahi maarna —
+        // 5 min ka cache theek hai.
+        .set('Cache-Control', 'public, max-age=300')
+        .send(renderPage({ ...meta, deepLink, webUrl }));
+    } catch (err) {
+      res.status(200).send(renderPage(fallback));
+    }
+  };
+}
+
 // @desc    Shared post ka landing page (preview + app me kholo)
 // @route   GET /p/:postId
 // @access  Public
-exports.sharePostPage = async (req, res) => {
-  const { postId } = req.params;
-  const webUrl = `${req.protocol}://${req.get('host')}/p/${postId}`;
-  const deepLink = { host: 'post', path: `/${postId}` };
-
-  // Post na mile / hata di gayi ho — page phir bhi bhejo (404 JSON
-  // nahi), taaki user ko app/store ka raasta mile.
-  const fallback = {
-    title: 'SiteLink',
-    description: 'Construction workers aur contractors ko jodne wala app.',
-    image: null,
-    deepLink,
-    webUrl,
-  };
-
-  try {
-    if (!mongoose.Types.ObjectId.isValid(postId)) {
-      return res.status(404).send(renderPage(fallback));
-    }
-
+exports.sharePostPage = makeSharePage({
+  pathPrefix: 'p',
+  deepLinkHost: 'post',
+  idParam: 'postId',
+  fallbackDescription:
+    'Construction workers aur contractors ko jodne wala app.',
+  loader: async (id) => {
     const post = await Post.findOne({
-      _id: postId,
+      _id: id,
       isActive: true,
       approvalStatus: 'approved',
     })
       .select('content images posterName companyName posterDesignation')
       .lean();
-
-    if (!post) return res.status(404).send(renderPage(fallback));
+    if (!post) return null;
 
     const by = [post.companyName, post.posterDesignation].find(
       (v) => v && v.trim()
     );
+    return {
+      title: by
+        ? `${post.posterName} · ${truncate(by, 40)}`
+        : String(post.posterName || 'SiteLink'),
+      description:
+        truncate(post.content, 160) || 'Dekhiye SiteLink community par.',
+      image: (post.images && post.images[0]) || null,
+    };
+  },
+});
 
-    res
-      .status(200)
-      // Crawler ko fresh chahiye par har hit pe DB bhi nahi maarna —
-      // 5 min ka cache theek hai.
-      .set('Cache-Control', 'public, max-age=300')
-      .send(
-        renderPage({
-          title: by
-            ? `${post.posterName} · ${truncate(by, 40)}`
-            : String(post.posterName || 'SiteLink'),
-          description:
-            truncate(post.content, 160) || 'Dekhiye SiteLink community par.',
-          image: (post.images && post.images[0]) || null,
-          deepLink,
-          webUrl,
-        })
-      );
-  } catch (err) {
-    res.status(200).send(renderPage(fallback));
-  }
-};
+// @desc    Shared job ka landing page. Vendor apni job share karta hai
+//          (log apply karein) aur worker doosron ko bhejta hai — dono
+//          ka link yahi hai.
+// @route   GET /j/:jobId
+// @access  Public
+exports.shareJobPage = makeSharePage({
+  pathPrefix: 'j',
+  deepLinkHost: 'job',
+  idParam: 'jobId',
+  fallbackDescription: 'SiteLink par construction jobs dhoondhiye.',
+  loader: async (id) => {
+    // Sirf live jobs — closed/pending job ka public preview banane ka
+    // matlab nahi, aur na hi uska data bahar jaana chahiye.
+    const job = await Job.findOne({
+      _id: id,
+      isActive: true,
+      approvalStatus: 'approved',
+    })
+      .select('title company location salary salaryType description isUrgent')
+      .lean();
+    if (!job) return null;
+
+    // "₹800/day · Andheri, Mumbai" — preview me sabse kaam ki do baatein
+    const bits = [];
+    if (job.salary) bits.push(`₹${job.salary}/${job.salaryType || 'day'}`);
+    if (job.location) bits.push(truncate(job.location, 40));
+
+    return {
+      title: [
+        job.isUrgent ? '🔴 Urgent' : null,
+        truncate(job.title, 60),
+        job.company ? `· ${truncate(job.company, 30)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
+      description:
+        [bits.join(' · '), truncate(job.description, 120)]
+          .filter((s) => s && s.length)
+          .join(' — ') || 'SiteLink par ye job dekhiye.',
+      // Jobs me image nahi hoti — preview me app ka logo hi theek hai.
+      image: process.env.SHARE_FALLBACK_IMAGE || null,
+    };
+  },
+});
 
 // @desc    Android App Links verification file. Abhi backend plain-HTTP
 //          IP par hai isliye Android ise verify nahi karega — par jaise
