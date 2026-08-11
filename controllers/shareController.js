@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
-const Job = require('../models/Job');
+// Filename lowercase hai (models/job.js) — Linux case-sensitive hai, isliye
+// '../models/Job' wahan MODULE_NOT_FOUND deta tha (Windows par chal jaata hai).
+const Job = require('../models/job');
 
 // ═══════════════════════════════════════════════════════════════════
 //  SHARE / DEEP LINK LANDING
