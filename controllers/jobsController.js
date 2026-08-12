@@ -376,9 +376,12 @@ exports.getJobDetailsById = async (req, res) => {
       });
     }
 
-    // Vendor ka phone/WhatsApp sirf tabhi bhejo jab is worker ki application
+    // Vendor ka WhatsApp number sirf tabhi bhejo jab is worker ki application
     // confirm/hire ho chuki ho — pending/shortlisted/rejected me contact
     // leak nahi hona chahiye. Vendor khud apna job dekh raha ho to bhi allowed.
+    const isOwner =
+      !!(job.postedBy && req.user?.id && job.postedBy._id?.toString() === req.user.id);
+
     let contactUnlocked = false;
     let applicationStatus = null;
     if (req.user?.userType === 'worker') {
@@ -388,13 +391,17 @@ exports.getJobDetailsById = async (req, res) => {
       }).select('status');
       applicationStatus = myApplication?.status || null;
       contactUnlocked = ['confirmed', 'hired'].includes(applicationStatus);
-    } else if (job.postedBy && req.user?.id) {
-      contactUnlocked = job.postedBy._id?.toString() === req.user.id;
+    } else {
+      contactUnlocked = isOwner;
     }
 
-    if (job.postedBy && !contactUnlocked) {
-      delete job.postedBy.phone;
-      delete job.postedBy.whatsappNumber;
+    if (job.postedBy) {
+      // Vendor ka asli/login number (`phone`) kabhi bahar nahi jaata — sirf
+      // job ka owner apna dekh sakta hai. Worker ko hamesha wahi WhatsApp
+      // number milta hai jo vendor ne profile me diya hai; na diya ho to
+      // kuch nahi (app "not shared" dikhata hai), phone par fallback nahi.
+      if (!isOwner) delete job.postedBy.phone;
+      if (!contactUnlocked) delete job.postedBy.whatsappNumber;
     }
 
     job.hasApplied = !!applicationStatus;
