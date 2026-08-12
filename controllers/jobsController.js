@@ -11,12 +11,39 @@ const { recalculateWorkerRating } = require('../utils/workerRating');
 // Total workers a vendor has already committed across their jobs. Deactivated
 // jobs still count (so delete+repost can't bypass the quota); only admin-
 // rejected jobs are excluded. `quantity` is stored as a string, so convert.
+// Plan ka worker quota MAHINE ka hai ("25 workers/month"), isliye sirf
+// current calendar month ki jobs ginte hain — har mahine ki 1 taarikh ko
+// quota apne aap reset ho jaata hai.
+//
+// Pehle ye vendor ki SAARI jobs ginta tha (koi date filter nahi), yani
+// ek baar 25 workers post karne ke baad vendor kabhi dobara post nahi kar
+// paata — chahe agla mahina aa jaaye ya subscription renew ho jaaye.
+function _currentPeriodStart() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+}
+
+/// Is mahine ab tak kitne workers post ho chuke.
+/// Deactivated jobs bhi ginti hain (warna delete+repost se quota bypass ho
+/// jaata); sirf admin-rejected jobs chhodte hain.
 async function _workersUsed(vendorId) {
   const agg = await Job.aggregate([
-    { $match: { postedBy: new mongoose.Types.ObjectId(vendorId), approvalStatus: { $ne: 'rejected' } } },
+    {
+      $match: {
+        postedBy: new mongoose.Types.ObjectId(vendorId),
+        approvalStatus: { $ne: 'rejected' },
+        createdAt: { $gte: _currentPeriodStart() },
+      },
+    },
     { $group: { _id: null, total: { $sum: { $convert: { input: '$quantity', to: 'int', onError: 0, onNull: 0 } } } } },
   ]);
   return agg.length ? agg[0].total : 0;
+}
+
+/// Agle mahine ki 1 taarikh — app "resets on 1 Sep" dikha sake.
+function _quotaResetsAt() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
 }
 
 function escapeRegex(str) {
@@ -186,20 +213,27 @@ exports.getMyJobs = async (req, res) => {
         && new Date(req.user.subscriptionExpiresAt) > now;
 
       let maxWorkers = 0;
+      let planName = null;
       if (hasActiveSub && req.user.activePlan) {
         const plan = await PlanDetails.findById(req.user.activePlan).select('maxWorkers planName');
         maxWorkers = Number(plan?.maxWorkers) || 0;
+        planName = plan?.planName || null;
       }
 
-      const used = jobs
-        .filter((j) => j.approvalStatus !== 'rejected')
-        .reduce((sum, j) => sum + (parseInt(j.quantity, 10) || 0), 0);
+      // Wahi helper jo createJob me enforce karta hai — warna vendor ko
+      // dikhne wala "10 bache hain" aur asli limit alag ho jaate, aur
+      // post block hone par confusion hoti.
+      const used = await _workersUsed(req.user.id);
 
       quota = {
         hasActiveSubscription: hasActiveSub,
+        planName,
         maxWorkers,
         used,
         remaining: maxWorkers > 0 ? Math.max(maxWorkers - used, 0) : null,
+        // Quota mahine ka hai — app "1 Sep ko reset hoga" dikha sake
+        periodStart: _currentPeriodStart(),
+        resetsAt: _quotaResetsAt(),
       };
     }
 
@@ -544,10 +578,17 @@ exports.createJob = async (req, res) => {
           return res.status(403).json({
             success: false,
             code: 'WORKER_QUOTA_EXCEEDED',
+            // Quota mahine ka hai — message me "this month" aur reset date
+            // dono batate hain, warna vendor ko lagta hai limit permanent hai.
             message: remaining <= 0
-              ? `You've reached your plan limit of ${maxWorkers} workers. Upgrade your plan to post more.`
-              : `Your plan allows ${maxWorkers} workers in total. Only ${remaining} left — you can't post ${workersNeeded} in this job.`,
-            data: { maxWorkers, used, remaining },
+              ? `You've used all ${maxWorkers} workers on your plan this month. It resets on ${_quotaResetsAt().toDateString()}, or upgrade to post more now.`
+              : `Your plan allows ${maxWorkers} workers per month. Only ${remaining} left this month — you can't post ${workersNeeded} in this job.`,
+            data: {
+              maxWorkers,
+              used,
+              remaining,
+              resetsAt: _quotaResetsAt(),
+            },
           });
         }
       }
