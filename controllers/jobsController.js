@@ -302,6 +302,28 @@ exports.applyToJob = async (req, res) => {
       });
     }
 
+    // ── Subscription gate (workers) ────────────────────────────────────
+    // Apply karne ke liye active plan zaroori hai. Vendor ke job-post gate
+    // jaisa hi shape — `code` isliye ki app message ka text parse kiye
+    // bina seedha Plans screen khol sake.
+    //
+    // `subscriptionStatus` par akele bharosa nahi karte: expiry par use
+    // koi cron 'expired' nahi karta, isliye date hi final faisla hai.
+    {
+      const now = new Date();
+      const hasActiveSub = user.subscriptionStatus === 'active'
+        && user.subscriptionExpiresAt
+        && new Date(user.subscriptionExpiresAt) > now;
+
+      if (!hasActiveSub) {
+        return res.status(403).json({
+          success: false,
+          code: 'SUBSCRIPTION_REQUIRED',
+          message: 'An active plan is required to apply for jobs. Please subscribe to a plan.',
+        });
+      }
+    }
+
     if (job.status === 'Closed' || job.status === 'Cancelled') {
       return res.status(400).json({
         success: false,
