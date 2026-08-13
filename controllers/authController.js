@@ -258,7 +258,8 @@ exports.googleAuthLogin = async (req, res) => {
       });
     }
 
-    const { uid, email, name, picture, firebase: { sign_in_provider } } = decodedToken;
+    // `picture` deliberately not read — see the user-create block below.
+    const { uid, email, name, firebase: { sign_in_provider } } = decodedToken;
 
     // Only allow Google sign-in via this endpoint
     if (sign_in_provider !== 'google.com') {
@@ -287,11 +288,17 @@ exports.googleAuthLogin = async (req, res) => {
         user.authProvider = 'google';
       } else {
         // Create new user
+        //
+        // Google ki `picture` jaan-boojh kar import NAHI karte. Worker ka
+        // profile photo wahi hona chahiye jo usne app me khud diya ho —
+        // Google account ki photo purani/anrelated ho sakti hai, aur
+        // verification ke waqt admin ko wahi "official" photo dikhti hai.
+        // Photo na hone par app initials wala avatar dikha deta hai, aur
+        // user Edit Profile se apni photo daal sakta hai.
         user = new User({
           firebaseUid: uid,
           email,
           name: name || null,
-          profileImage: picture || null,
           authProvider: 'google',
           isPhoneVerified: true, // Assume Google accounts are verified(as we dont require any otp verification for google auth)
         });
