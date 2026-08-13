@@ -210,15 +210,36 @@ exports.googleAuthLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Firebase ID token is required' });
     }
 
-    // Decode header without verifying to check algorithm
+    // Decode header + payload without verifying — sirf saaf error dene ke
+    // liye. Asli verification neeche verifyIdToken karta hai.
+    let unverifiedAud;
     try {
-      const headerB64 = firebaseIdToken.split('.')[0];
+      const [headerB64, payloadB64] = firebaseIdToken.split('.');
       const header = JSON.parse(Buffer.from(headerB64, 'base64').toString());
       if (header.alg !== 'RS256') {
         return res.status(400).json({ success: false, message: `Invalid token: expected Firebase ID token (RS256) but got ${header.alg}. Do not send your app JWT here.` });
       }
+      unverifiedAud = JSON.parse(Buffer.from(payloadB64, 'base64').toString()).aud;
     } catch {
       return res.status(400).json({ success: false, message: 'Malformed token' });
+    }
+
+    // Token kis Firebase project ka hai vs. server kis project ke liye
+    // configured hai. Mismatch par firebase-admin bhi sirf
+    // `auth/argument-error` deta hai, jisse pata hi nahi chalta ki asli
+    // wajah project mismatch hai — isliye yahan pehle hi saaf bata dete
+    // hain. Project id secret nahi hai (token me hi aata hai).
+    const configuredProject = process.env.FIREBASE_PROJECT_ID;
+    if (!configuredProject) {
+      console.error('[googleAuthLogin] FIREBASE_PROJECT_ID is not set — cannot verify Firebase tokens.');
+      return res.status(500).json({ success: false, message: 'Firebase Admin is not configured on the server' });
+    }
+    if (unverifiedAud && unverifiedAud !== configuredProject) {
+      console.error(`[googleAuthLogin] Firebase project mismatch: token aud="${unverifiedAud}", server FIREBASE_PROJECT_ID="${configuredProject}"`);
+      return res.status(401).json({
+        success: false,
+        message: `Firebase project mismatch: this token belongs to "${unverifiedAud}" but the server is configured for "${configuredProject}"`,
+      });
     }
 
     // Verify Firebase token
@@ -227,7 +248,14 @@ exports.googleAuthLogin = async (req, res) => {
       decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
     } catch (e) {
       console.error('Firebase token verification failed:', e.code, e.message);
-      return res.status(401).json({ success: false, message: `Invalid or expired Firebase token: ${e.code}` });
+      const isProduction = process.env.NODE_ENV === 'production';
+      return res.status(401).json({
+        success: false,
+        message: `Invalid or expired Firebase token: ${e.code}`,
+        // `e.code` akela debug karne ke liye kaafi nahi — asli wajah
+        // message me hoti hai. Production me ise bahar nahi bhejte.
+        ...(isProduction ? {} : { detail: e.message }),
+      });
     }
 
     const { uid, email, name, picture, firebase: { sign_in_provider } } = decodedToken;
