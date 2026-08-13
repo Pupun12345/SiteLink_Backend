@@ -64,6 +64,9 @@ function _formatJobSummary(job, applicationStatus = null) {
     latitude: job.latitude,
     longitude: job.longitude,
     workersNeeded: job.quantity,
+    // Per-role breakdown — purani jobs me khaali, app tab title par
+    // fallback kar deti hai.
+    roles: job.roles || [],
     duration: job.duration || null,
     experience: job.experience || null,
     description: job.description || null,
@@ -372,7 +375,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -440,7 +443,7 @@ exports.appliedJobs = async (req, res) => {
     }
 
     const data = await Application.find({ applicant: applicantID })
-      .populate('job', 'title company location latitude longitude salary salaryType isUrgent duration description experience status approvalStatus')
+      .populate('job', 'title company location latitude longitude quantity roles salary salaryType isUrgent duration description experience status approvalStatus')
       .lean();
 
     res.status(200).json({
@@ -462,7 +465,7 @@ exports.appliedJobs = async (req, res) => {
 // @access  Private
 exports.createJob = async (req, res) => {
   try {
-    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience, amenities } = req.body;
+    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience, amenities, roles } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -552,7 +555,32 @@ exports.createJob = async (req, res) => {
       amenityObjectIds = amenityDocs.map((amenity) => amenity._id);
     }
 
-    const workersNeeded = Number(quantity);
+    // ── Per-role breakdown (optional) ──────────────────────────────────
+    // Aaya ho to yahi authoritative hai aur `quantity` iska total ban
+    // jaata hai — warna dono alag ho sakte the aur plan ka quota (jo
+    // `quantity` padhta hai) galat gina jaata.
+    let parsedRoles = [];
+    if (roles !== undefined) {
+      if (!Array.isArray(roles)) {
+        return res.status(400).json({ success: false, message: 'roles must be an array' });
+      }
+      for (const r of roles) {
+        const skill = (r?.skill ?? '').toString().trim();
+        const qty = Number(r?.quantity);
+        if (!skill) {
+          return res.status(400).json({ success: false, message: 'Each role needs a skill name' });
+        }
+        if (!Number.isFinite(qty) || qty < 1) {
+          return res.status(400).json({ success: false, message: `Invalid quantity for role "${skill}"` });
+        }
+        parsedRoles.push({ skill, quantity: Math.floor(qty) });
+      }
+    }
+
+    const workersNeeded = parsedRoles.length
+      ? parsedRoles.reduce((sum, r) => sum + r.quantity, 0)
+      : Number(quantity);
+
     if (
       isNaN(workersNeeded) ||
       workersNeeded <= 0
@@ -610,6 +638,7 @@ exports.createJob = async (req, res) => {
       latitude: latitude ? latitude.trim() : null,
       longitude: longitude ? longitude.trim() : null,
       quantity: workersNeeded,
+      roles: parsedRoles,
       salary: parsedSalary,
       salaryType: salaryType,
       isUrgent: isUrgent,

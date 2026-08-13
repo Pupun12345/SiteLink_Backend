@@ -27,6 +27,26 @@ const jobSchema = new mongoose.Schema(
       type: String,
       default: '1',
     },
+    // Ek job me kai roles ho sakte hain, har ek ki apni count —
+    // "2 Welder + 1 Mason + 3 Helper". Pehle ye sirf title me
+    // ("Welder +3 more Required") aur description ke free text me
+    // ("Roles: 2 x Welder, ...") jaata tha, isliye app ise theek se
+    // dikha hi nahi sakti thi aur role ke hisaab se filter bhi tootta tha.
+    //
+    // `quantity` inka total hi rehta hai — plan ka worker quota wahi
+    // padhta hai, isliye dono ko sync rakhna zaroori hai.
+    // Purani jobs me ye khaali hai; app tab title/description par
+    // fallback karti hai.
+    roles: {
+      type: [
+        {
+          _id: false,
+          skill: { type: String, required: true, trim: true },
+          quantity: { type: Number, required: true, min: 1 },
+        },
+      ],
+      default: [],
+    },
     salary: {
       type: Number,
     },
