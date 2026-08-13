@@ -7,6 +7,7 @@ const Amenity = require('../models/amenities');
 const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
 const { recalculateWorkerRating } = require('../utils/workerRating');
+const { hasActiveSubscription, subscriptionRequired } = require('../utils/subscription');
 
 // Total workers a vendor has already committed across their jobs. Deactivated
 // jobs still count (so delete+repost can't bypass the quota); only admin-
@@ -207,10 +208,7 @@ exports.getMyJobs = async (req, res) => {
     // Worker quota summary — vendor ko dikhane ke liye (kitne use kiye / bache).
     let quota = null;
     if (req.user.userType === 'vendor') {
-      const now = new Date();
-      const hasActiveSub = req.user.subscriptionStatus === 'active'
-        && req.user.subscriptionExpiresAt
-        && new Date(req.user.subscriptionExpiresAt) > now;
+      const hasActiveSub = hasActiveSubscription(req.user);
 
       let maxWorkers = 0;
       let planName = null;
@@ -303,25 +301,11 @@ exports.applyToJob = async (req, res) => {
     }
 
     // ── Subscription gate (workers) ────────────────────────────────────
-    // Apply karne ke liye active plan zaroori hai. Vendor ke job-post gate
-    // jaisa hi shape — `code` isliye ki app message ka text parse kiye
-    // bina seedha Plans screen khol sake.
-    //
-    // `subscriptionStatus` par akele bharosa nahi karte: expiry par use
-    // koi cron 'expired' nahi karta, isliye date hi final faisla hai.
-    {
-      const now = new Date();
-      const hasActiveSub = user.subscriptionStatus === 'active'
-        && user.subscriptionExpiresAt
-        && new Date(user.subscriptionExpiresAt) > now;
-
-      if (!hasActiveSub) {
-        return res.status(403).json({
-          success: false,
-          code: 'SUBSCRIPTION_REQUIRED',
-          message: 'An active plan is required to apply for jobs. Please subscribe to a plan.',
-        });
-      }
+    // Apply karne ke liye active plan zaroori hai.
+    if (!hasActiveSubscription(user)) {
+      return res.status(403).json(subscriptionRequired(
+        'An active plan is required to apply for jobs. Please subscribe to a plan.'
+      ));
     }
 
     if (job.status === 'Closed' || job.status === 'Cancelled') {
@@ -581,17 +565,10 @@ exports.createJob = async (req, res) => {
 
     // ── Subscription gate + worker quota (vendors only; admin exempt) ──
     if (user.userType === 'vendor') {
-      const now = new Date();
-      const hasActiveSub = user.subscriptionStatus === 'active'
-        && user.subscriptionExpiresAt
-        && new Date(user.subscriptionExpiresAt) > now;
-
-      if (!hasActiveSub || !user.activePlan) {
-        return res.status(403).json({
-          success: false,
-          code: 'SUBSCRIPTION_REQUIRED',
-          message: 'An active subscription is required to post jobs. Please subscribe to a plan.',
-        });
+      if (!hasActiveSubscription(user) || !user.activePlan) {
+        return res.status(403).json(subscriptionRequired(
+          'An active subscription is required to post jobs. Please subscribe to a plan.'
+        ));
       }
 
       const plan = await PlanDetails.findById(user.activePlan);

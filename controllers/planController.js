@@ -1,5 +1,6 @@
 const planDetails = require('../models/PlanDetails');
 const Subscription = require('../models/Subscription');
+const { hasActiveSubscription } = require('../utils/subscription');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -13,11 +14,7 @@ async function currentSubscription(user) {
         ? new Date(user.subscriptionExpiresAt)
         : null;
 
-    // `subscriptionStatus` stale ho sakta hai (expiry par koi cron ise
-    // 'expired' nahi karta), isliye date hi final faisla karti hai.
-    const isActive = user.subscriptionStatus === 'active'
-        && !!expiresAt
-        && expiresAt > now;
+    const isActive = hasActiveSubscription(user);
 
     const planId = user.activePlan ? user.activePlan.toString() : null;
 
@@ -88,7 +85,7 @@ exports.getPlans = async (req, res) => {
 
 exports.createPlan = async (req, res) => {
     try {
-        const { planName, userType, planType, frequency, amount, features } = req.body;
+        const { planName, userType, planType, frequency, amount, features, maxWorkers } = req.body;
         if (!planName || !userType || !planType || !frequency || amount === undefined) {
             return res.status(400).json({ success: false, message: 'planName, userType, planType, frequency and amount are required' });
         }
@@ -98,6 +95,10 @@ exports.createPlan = async (req, res) => {
             planType,
             frequency,
             amount: parseFloat(amount),
+            // Vendor plan ka monthly worker quota. Chhoot gaya to 0 rehta
+            // hai, aur 0 ka matlab hai "cap off" — yani vendor unlimited
+            // workers post kar lega. Isliye admin ise zaroor bheje.
+            maxWorkers: maxWorkers === undefined ? 0 : Math.max(0, parseInt(maxWorkers, 10) || 0),
             features: Array.isArray(features) ? features.filter(f => f.trim()) : [],
             isActive: true,
         });
@@ -110,7 +111,7 @@ exports.createPlan = async (req, res) => {
 exports.editPlanAmount = async (req, res) => {
     try {
         const { id } = req.params;
-        const { planName, userType, planType, frequency, amount, features } = req.body;
+        const { planName, userType, planType, frequency, amount, features, maxWorkers } = req.body;
 
         const plan = await planDetails.findById(id);
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
@@ -120,6 +121,9 @@ exports.editPlanAmount = async (req, res) => {
         if (planType !== undefined) plan.planType = planType;
         if (frequency !== undefined) plan.frequency = frequency;
         if (amount !== undefined) plan.amount = parseFloat(amount);
+        // Pehle ye handle hi nahi hota tha — admin panel se plan edit karte
+        // hi quota chup-chaap 0 (unlimited) reh jaata tha.
+        if (maxWorkers !== undefined) plan.maxWorkers = Math.max(0, parseInt(maxWorkers, 10) || 0);
         if (features !== undefined) plan.features = Array.isArray(features) ? features.filter(f => f.trim()) : [];
 
         await plan.save();
