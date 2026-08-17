@@ -52,23 +52,21 @@ exports.getCommunityFeed = async (req, res) => {
       approvalStatus: "approved",
     };
 
-    const [posts, total] = await Promise.all([
-      Post.find(filter)
-        // designation/primarySkill/companyName bhi chahiye — purani posts
-        // me ye snapshot nahi hain, unke liye live profile se fallback
-        // lete hain (feed me vendor ka company name aur worker ki skill
-        // dikhani hai, khaali badge nahi).
-        .populate(
-          "postedBy",
-          "name profileImage designation primarySkill companyName"
-        )
-        .populate("likes.userId", "name")
+    const [adminPosts, otherPosts, total] = await Promise.all([
+      Post.find({ ...filter, posterType: 'admin' })
+        .populate('postedBy', 'name profileImage designation primarySkill companyName')
+        .populate('likes.userId', 'name')
+        .sort({ createdAt: -1 }),
+      Post.find({ ...filter, posterType: { $ne: 'admin' } })
+        .populate('postedBy', 'name profileImage designation primarySkill companyName')
+        .populate('likes.userId', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-
       Post.countDocuments(filter),
     ]);
+
+    const posts = [...adminPosts, ...otherPosts];
 
     const formattedPosts = posts.map((post) => ({
       type: "post",

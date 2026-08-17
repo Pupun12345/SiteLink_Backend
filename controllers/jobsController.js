@@ -141,7 +141,9 @@ exports.getJobs = async (req, res) => {
       lowestSalary: { salary: 1 },
     };
 
-    const sortOrder = sortMap[sort] || { createdAt: -1 };
+    // Admin posts always pinned to top, then apply the requested sort.
+    const baseSortOrder = sortMap[sort] || { createdAt: -1 };
+    const sortOrder = { autoApproved: -1, ...baseSortOrder };
 
     const [jobs, total] = await Promise.all([
       Job.find(filter)
