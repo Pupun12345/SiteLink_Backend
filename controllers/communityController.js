@@ -52,21 +52,24 @@ exports.getCommunityFeed = async (req, res) => {
       approvalStatus: "approved",
     };
 
-    const [adminPosts, otherPosts, total] = await Promise.all([
-      Post.find({ ...filter, posterType: 'admin' })
-        .populate('postedBy', 'name profileImage designation primarySkill companyName')
-        .populate('likes.userId', 'name')
-        .sort({ createdAt: -1 }),
-      Post.find({ ...filter, posterType: { $ne: 'admin' } })
-        .populate('postedBy', 'name profileImage designation primarySkill companyName')
-        .populate('likes.userId', 'name')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+    const [posts, total] = await Promise.all([
+      Post.aggregate([
+        { $match: filter },
+        { $addFields: {
+          _dayBucket: { $dateTrunc: { date: '$createdAt', unit: 'day' } },
+          _adminFirst: { $cond: [{ $eq: ['$posterType', 'admin'] }, 0, 1] },
+        }},
+        { $sort: { _dayBucket: -1, _adminFirst: 1, createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'postedBy' } },
+        { $unwind: { path: '$postedBy', preserveNullAndEmptyArrays: true } },
+      ]),
       Post.countDocuments(filter),
     ]);
 
-    const posts = [...adminPosts, ...otherPosts];
+    // Re-populate likes.userId for name (aggregate doesn't auto-populate)
+    await Post.populate(posts, { path: 'likes.userId', select: 'name' });
 
     const formattedPosts = posts.map((post) => ({
       type: "post",
