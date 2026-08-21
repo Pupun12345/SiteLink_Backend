@@ -20,6 +20,26 @@ function posterAvatar(post, author) {
   return post.posterImage || author?.profileImage || null;
 }
 
+// Worker ki performance rating — feed me naam ke baad dikhti hai, jaise
+// vendor ke naam ke baad verified badge.
+//
+// Ye LIVE bhejte hain, snapshot nahi: rating job outcomes se badalti
+// rehti hai (utils/workerRating.js), isliye purani post par bhi aaj ki
+// rating dikhni chahiye.
+//
+// `ratedJobsCount` saath jaata hai kyunki app 0 par "New" dikhati hai,
+// "0.0 ★" nahi — naye worker ko 0 stars dikhana galat signal hai.
+// Vendor/admin par null (unki rating hi nahi hoti).
+function posterRatingFields(post, author) {
+  if (post.posterType !== 'worker') {
+    return { posterRating: null, posterRatedJobsCount: null };
+  }
+  return {
+    posterRating: author?.rating ?? 0,
+    posterRatedJobsCount: author?.ratedJobsCount ?? 0,
+  };
+}
+
 // Feed, myPosts aur single-post — teeno ek hi shape bhejte hain, warna
 // app ko har endpoint ke liye alag parsing likhni padti hai.
 // `postedBy` populated ho to purani posts ke missing snapshots (jaise
@@ -42,6 +62,7 @@ function formatPost(post) {
       author?.primarySkill ||
       null,
     companyName: post.companyName || author?.companyName || null,
+    ...posterRatingFields(post, author),
     verification: post.verification,
     approvalStatus: post.approvalStatus,
     likesCount: post.likesCount,
@@ -103,6 +124,7 @@ exports.getCommunityFeed = async (req, res) => {
         post.postedBy?.primarySkill ||
         null,
       companyName: post.companyName || post.postedBy?.companyName || null,
+      ...posterRatingFields(post, post.postedBy),
       verification: post.verification,
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
@@ -172,6 +194,7 @@ exports.getMyPosts = async (req, res) => {
         req.user?.primarySkill ||
         null,
       companyName: post.companyName || req.user?.companyName || null,
+      ...posterRatingFields(post, req.user),
       verification: post.verification,
       approvalStatus: post.approvalStatus,
       isActive: post.isActive,
@@ -314,8 +337,9 @@ exports.getPostById = async (req, res) => {
     const post = await Post.findById(postId)
       .populate(
         'postedBy',
-        // companyLogo bhi — vendor ka avatar isi se banta hai (posterAvatar).
-        'name profileImage companyLogo designation primarySkill companyName'
+        // companyLogo — vendor ka avatar isi se banta hai (posterAvatar).
+        // rating/ratedJobsCount — worker ka rating badge (posterRatingFields).
+        'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount'
       )
       .populate('likes.userId', 'name');
 
