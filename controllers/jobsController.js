@@ -446,7 +446,15 @@ exports.appliedJobs = async (req, res) => {
     }
 
     const data = await Application.find({ applicant: applicantID })
-      .populate('job', 'title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience status approvalStatus')
+      // `postedBy` bhi chahiye: app company name live profile se leti hai
+      // (stored `company` me purani jobs me vendor ka personal naam pada
+      // hai). Nested populate ke bina applied list me wahi galat naam
+      // dikhta rehta.
+      .populate({
+        path: 'job',
+        select: 'title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience status approvalStatus postedBy',
+        populate: { path: 'postedBy', select: 'name companyName' },
+      })
       .lean();
 
     res.status(200).json({
