@@ -306,13 +306,10 @@ exports.applyToJob = async (req, res) => {
       });
     }
 
-    // ── Subscription gate (workers) ────────────────────────────────────
-    // Apply karne ke liye active plan zaroori hai.
-    if (!hasActiveSubscription(user)) {
-      return res.status(403).json(subscriptionRequired(
-        'An active plan is required to apply for jobs. Please subscribe to a plan.'
-      ));
-    }
+    // Job apply karna FREE hai — koi subscription gate nahi. Worker plan
+    // ke features (skill rating, priority shortlisting, emergency support,
+    // call/WhatsApp support) apply karne se alag hain; apply har verified
+    // worker kar sakta hai.
 
     if (job.status === 'Closed' || job.status === 'Cancelled') {
       return res.status(400).json({
