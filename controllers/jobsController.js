@@ -68,6 +68,7 @@ function _formatJobSummary(job, applicationStatus = null) {
     // fallback kar deti hai.
     roles: job.roles || [],
     duration: job.duration || null,
+    startDate: job.startDate || null,
     experience: job.experience || null,
     description: job.description || null,
     salary: job.salary,
@@ -377,7 +378,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -445,7 +446,7 @@ exports.appliedJobs = async (req, res) => {
     }
 
     const data = await Application.find({ applicant: applicantID })
-      .populate('job', 'title company location latitude longitude quantity roles salary salaryType isUrgent duration description experience status approvalStatus')
+      .populate('job', 'title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience status approvalStatus')
       .lean();
 
     res.status(200).json({
@@ -467,7 +468,7 @@ exports.appliedJobs = async (req, res) => {
 // @access  Private
 exports.createJob = async (req, res) => {
   try {
-    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience, amenities, roles } = req.body;
+    const { title, company, location, latitude, longitude, quantity, salary, salaryType, isUrgent, duration, description, experience, amenities, roles, startDate } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -555,6 +556,16 @@ exports.createJob = async (req, res) => {
         });
       }
       amenityObjectIds = amenityDocs.map((amenity) => amenity._id);
+    }
+
+    // Kaam kab shuru hoga (optional). Parse na ho to saaf error — chup-chaap
+    // null save karne se vendor ko lagta hai date chali gayi.
+    let parsedStartDate = null;
+    if (startDate !== undefined && startDate !== null && `${startDate}`.trim() !== '') {
+      parsedStartDate = new Date(startDate);
+      if (isNaN(parsedStartDate.getTime())) {
+        return res.status(400).json({ success: false, message: 'Invalid start date' });
+      }
     }
 
     // ── Per-role breakdown (optional) ──────────────────────────────────
@@ -645,6 +656,7 @@ exports.createJob = async (req, res) => {
       salaryType: salaryType,
       isUrgent: isUrgent,
       duration: duration,
+      startDate: parsedStartDate,
       description: description.trim(),
       amenities: amenityObjectIds,
       experience: exp,

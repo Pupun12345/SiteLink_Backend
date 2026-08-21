@@ -62,6 +62,14 @@ const jobSchema = new mongoose.Schema(
     duration: {
       type: String,
     },
+    // Kaam kab shuru hoga. Pehle ye sirf description ke free text me
+    // ("Start: 12 Sep 2026") jaata tha, isliye app ise theek se dikha hi
+    // nahi sakti thi — aur worker ko "Start" ki jagah job ki posting date
+    // dikh jaati thi. Purani jobs me null.
+    startDate: {
+      type: Date,
+      default: null,
+    },
     description: {
       type: String,
       required: true,
