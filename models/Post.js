@@ -2,9 +2,12 @@ const mongoose = require('mongoose');
 
 const postSchema = new mongoose.Schema(
   {
+    // Sirf photo/video wala post bilkul valid hai (social feed hai), isliye
+    // content required NAHI hai. "Poora khaali post" na ban jaaye — ye
+    // controller me check hota hai (content ya media, kuch to ho).
     content: {
       type: String,
-      required: [true, 'Please provide post content'],
+      default: '',
       trim: true,
       maxlength: [1000, 'Post content cannot exceed 1000 characters'],
     },

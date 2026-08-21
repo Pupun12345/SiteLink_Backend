@@ -206,8 +206,18 @@ exports.createPost = async (req, res) => {
 
     const video = req.files?.video?.[0]?.path || null;
 
+    // Text ya media — kuch to hona chahiye. Sirf photo wala post theek hai,
+    // sirf video wala bhi; poora khaali nahi.
+    const text = (content ?? '').toString().trim();
+    if (!text && images.length === 0 && !video) {
+      return res.status(400).json({
+        success: false,
+        message: 'Add some text, a photo or a video to post.',
+      });
+    }
+
     const postData = {
-      content,
+      content: text,
       feeling: feeling || null,
       postedBy: userId,
       posterName: user.name,
@@ -253,6 +263,15 @@ exports.createPost = async (req, res) => {
       },
     });
   } catch (error) {
+    // Schema validation fail hona client ki galti hai, server ki nahi —
+    // 500 dene se app "server down" jaisa generic error dikhata tha.
+    if (error.name === 'ValidationError') {
+      const first = Object.values(error.errors || {})[0];
+      return res.status(400).json({
+        success: false,
+        message: first?.message || 'Invalid post data',
+      });
+    }
     res.status(500).json({ success: false, message: 'Error creating post', error: error.message });
   }
 };
