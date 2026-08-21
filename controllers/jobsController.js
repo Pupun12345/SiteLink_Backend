@@ -1049,6 +1049,12 @@ exports.rejectJob = async (req, res) => {
   }
 };
 
+/// Worker ki rating doosron (vendor) ko dikhani hai? Ye plan ka feature
+/// hai, isliye active subscription ke bina nahi dikhti.
+function _workerRatingVisible(worker) {
+  return hasActiveSubscription(worker);
+}
+
 // Helper: shape an Application's populated applicant into the `worker` object the app expects.
 function _formatApplicant(application) {
   const w = application.applicant || {};
@@ -1068,11 +1074,19 @@ function _formatApplicant(application) {
       // Automatic performance rating — job outcomes se calculate hoti hai.
       // 0 = naya worker (abhi koi job complete nahi ki); app ise "New"
       // dikhata hai, 0 stars nahi.
-      rating: typeof w.rating === 'number' ? w.rating : 0,
+      //
+      // PAID PERK: rating vendor ko dikhna worker plan ka feature hai
+      // ("Skill Rating & Verification — prioritized shortlisting by top
+      // contractors"). Plan na ho to null jaata hai aur app rating wali
+      // jagah kuch nahi dikhati. Worker apni rating apni profile me
+      // hamesha dekh sakta hai.
+      rating: _workerRatingVisible(w)
+        ? (typeof w.rating === 'number' ? w.rating : 0)
+        : null,
       jobsCompleted: w.jobsCompleted || 0,
       // Rating kitni jobs par bani hai — vendor samajh sake ki number
       // kitna bharosemand hai (4.5 on 2 jobs vs 4.5 on 40 jobs).
-      ratedJobsCount: w.ratedJobsCount || 0,
+      ratedJobsCount: _workerRatingVisible(w) ? (w.ratedJobsCount || 0) : null,
       // Admin ka manual rating alag hai — mila mat do.
       adminRating: w.adminRating != null ? w.adminRating : null,
     },
@@ -1108,7 +1122,7 @@ exports.getJobApplicants = async (req, res) => {
     }
 
     const applications = await Application.find({ job: id })
-      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating rating jobsCompleted ratedJobsCount')
+      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating rating jobsCompleted ratedJobsCount subscriptionStatus subscriptionExpiresAt')
       .sort({ createdAt: -1 })
       .lean();
 

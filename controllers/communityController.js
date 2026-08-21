@@ -3,6 +3,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
 const notifyUser = require('../utils/notifyUser');
+const { hasActiveSubscription } = require('../utils/subscription');
 
 // Feed/post me dikhne wala avatar.
 //
@@ -30,8 +31,17 @@ function posterAvatar(post, author) {
 // `ratedJobsCount` saath jaata hai kyunki app 0 par "New" dikhati hai,
 // "0.0 ★" nahi — naye worker ko 0 stars dikhana galat signal hai.
 // Vendor/admin par null (unki rating hi nahi hoti).
-function posterRatingFields(post, author) {
+//
+// PAID PERK: rating DOOSRON ko dikhna worker plan ka feature hai ("Skill
+// Rating & Verification — leading to prioritized shortlisting by top
+// contractors"). Plan na ho to null jaata hai aur app kuch nahi dikhati.
+// Worker khud apni rating hamesha dekh sakta hai (apna data chhupana
+// bekaar hai) — uske liye `isSelf: true` pass karo.
+function posterRatingFields(post, author, { isSelf = false } = {}) {
   if (post.posterType !== 'worker') {
+    return { posterRating: null, posterRatedJobsCount: null };
+  }
+  if (!isSelf && !hasActiveSubscription(author)) {
     return { posterRating: null, posterRatedJobsCount: null };
   }
   return {
@@ -44,8 +54,10 @@ function posterRatingFields(post, author) {
 // app ko har endpoint ke liye alag parsing likhni padti hai.
 // `postedBy` populated ho to purani posts ke missing snapshots (jaise
 // posterDesignation) live profile se bhar jaate hain.
-function formatPost(post) {
+function formatPost(post, { viewerId } = {}) {
   const author = post.postedBy && post.postedBy._id ? post.postedBy : null;
+  // Shared link apna hi post ho sakta hai — tab rating chhupani nahi hai.
+  const isSelf = !!viewerId && author?._id?.toString() === viewerId.toString();
   return {
     type: 'post',
     _id: post._id,
@@ -62,7 +74,7 @@ function formatPost(post) {
       author?.primarySkill ||
       null,
     companyName: post.companyName || author?.companyName || null,
-    ...posterRatingFields(post, author),
+    ...posterRatingFields(post, author, { isSelf }),
     verification: post.verification,
     approvalStatus: post.approvalStatus,
     likesCount: post.likesCount,
@@ -194,7 +206,8 @@ exports.getMyPosts = async (req, res) => {
         req.user?.primarySkill ||
         null,
       companyName: post.companyName || req.user?.companyName || null,
-      ...posterRatingFields(post, req.user),
+      // Apni hi posts — rating hamesha dikhti hai, plan ho ya na ho.
+      ...posterRatingFields(post, req.user, { isSelf: true }),
       verification: post.verification,
       approvalStatus: post.approvalStatus,
       isActive: post.isActive,
@@ -339,7 +352,7 @@ exports.getPostById = async (req, res) => {
         'postedBy',
         // companyLogo — vendor ka avatar isi se banta hai (posterAvatar).
         // rating/ratedJobsCount — worker ka rating badge (posterRatingFields).
-        'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount'
+        'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount subscriptionStatus subscriptionExpiresAt'
       )
       .populate('likes.userId', 'name');
 
@@ -360,7 +373,10 @@ exports.getPostById = async (req, res) => {
       });
     }
 
-    res.status(200).json({ success: true, data: formatPost(post) });
+    res.status(200).json({
+      success: true,
+      data: formatPost(post, { viewerId: req.user?.id }),
+    });
   } catch (error) {
     res.status(500).json({
       success: false,

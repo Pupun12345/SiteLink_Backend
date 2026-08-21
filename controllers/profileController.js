@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Skill = require('../models/Skill');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
 const notifyUser = require('../utils/notifyUser');
+const { hasActiveSubscription } = require('../utils/subscription');
 
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
@@ -1065,7 +1066,11 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
-        subscription: regularUser.subscription
+        subscription: regularUser.subscription,
+        // Live plan status. `subscription` boolean stale ho jaata hai (expiry
+        // par koi cron use false nahi karta), isliye app paid features
+        // (Contact Support waghairah) ka lock isi se decide karti hai.
+        hasActivePlan: hasActiveSubscription(regularUser)
       }
       : {
         id: regularUser._id,
@@ -1092,7 +1097,11 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
-        subscription: regularUser.subscription
+        subscription: regularUser.subscription,
+        // Live plan status. `subscription` boolean stale ho jaata hai (expiry
+        // par koi cron use false nahi karta), isliye app paid features
+        // (Contact Support waghairah) ka lock isi se decide karti hai.
+        hasActivePlan: hasActiveSubscription(regularUser)
       };
 
     return res.json({
