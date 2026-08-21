@@ -4,6 +4,22 @@ const User = require('../models/User');
 const Comment = require('../models/Comment');
 const notifyUser = require('../utils/notifyUser');
 
+// Feed/post me dikhne wala avatar.
+//
+// Vendor ki pehchaan uski company hai, isliye uska avatar company logo
+// hota hai — wahi jo vendor profile screen par dikhta hai. Live logo ko
+// snapshot se pehle rakhte hain: profile me logo badle to feed me turant
+// dikhta hai, aur purani posts (jinke snapshot me vendor ka personal
+// profileImage pada hai) apne aap theek ho jaati hain.
+//
+// Worker/admin par snapshot hi pehle — post jaisi thi waisi dikhe.
+function posterAvatar(post, author) {
+  if (post.posterType === 'vendor') {
+    return author?.companyLogo || post.posterImage || author?.profileImage || null;
+  }
+  return post.posterImage || author?.profileImage || null;
+}
+
 // Feed, myPosts aur single-post — teeno ek hi shape bhejte hain, warna
 // app ko har endpoint ke liye alag parsing likhni padti hai.
 // `postedBy` populated ho to purani posts ke missing snapshots (jaise
@@ -18,7 +34,7 @@ function formatPost(post) {
     video: post.video,
     feeling: post.feeling,
     posterName: post.posterName,
-    posterImage: post.posterImage,
+    posterImage: posterAvatar(post, author),
     posterType: post.posterType,
     posterDesignation:
       post.posterDesignation ||
@@ -79,7 +95,7 @@ exports.getCommunityFeed = async (req, res) => {
       video: post.video,
       feeling: post.feeling,
       posterName: post.posterName,
-      posterImage: post.posterImage,
+      posterImage: posterAvatar(post, post.postedBy),
       posterType: post.posterType,
       posterDesignation:
         post.posterDesignation ||
@@ -147,7 +163,7 @@ exports.getMyPosts = async (req, res) => {
       video: post.video,
       feeling: post.feeling,
       posterName: post.posterName,
-      posterImage: post.posterImage,
+      posterImage: posterAvatar(post, req.user),
       posterType: post.posterType,
       // Apni hi posts hain — purani posts ke liye req.user se fallback.
       posterDesignation:
@@ -221,7 +237,11 @@ exports.createPost = async (req, res) => {
       feeling: feeling || null,
       postedBy: userId,
       posterName: user.name,
-      posterImage: user.profileImage,
+      // Vendor ka avatar company logo hai (feed/detail dono me), logo na
+      // ho to profile photo. Worker/admin par profile photo hi.
+      posterImage: user.userType === 'vendor'
+        ? (user.companyLogo || user.profileImage)
+        : user.profileImage,
       posterType: user.userType,
       // Vendor ke liye designation, worker ke liye primarySkill
       posterDesignation: user.designation || user.primarySkill || null,
@@ -294,7 +314,8 @@ exports.getPostById = async (req, res) => {
     const post = await Post.findById(postId)
       .populate(
         'postedBy',
-        'name profileImage designation primarySkill companyName'
+        // companyLogo bhi — vendor ka avatar isi se banta hai (posterAvatar).
+        'name profileImage companyLogo designation primarySkill companyName'
       )
       .populate('likes.userId', 'name');
 
