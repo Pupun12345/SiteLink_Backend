@@ -1488,12 +1488,48 @@ exports.createVendorProfile = async (req, res) => {
 
     if (user.userType && user.userType !== 'vendor') return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID, panNumber } = req.body;
+    const { companyName, name, email, designation, workArea, gstNumber, whatsappNumber, website, workStateID, workCityID, panNumber, phone } = req.body;
 
     if (!companyName) return res.status(400).json({ success: false, message: 'Company name is required' });
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
     if (!designation) return res.status(400).json({ success: false, message: 'Designation is required' });
     if (!panNumber) return res.status(400).json({ success: false, message: 'PanNumber is required' });
+
+    // ── Contact number ────────────────────────────────────────────────
+    // WhatsApp number ke alawa ek normal number bhi lete hain. Ye
+    // `user.phone` hai — yani wahi number jise baad me OTP se badla jaa
+    // sakta hai (POST /profile/phone/send-otp). Google se login karne
+    // wale vendor ke paas ye hota hi nahi, isliye registration me maangna
+    // zaroori hai.
+    //
+    // Google-login vendor ke paas phone nahi hota, par OTP-login wale ke
+    // paas pehle se hota hai — tab dobara na maango to bhi chalega, par
+    // aaye to validate + duplicate check karte hain.
+    let parsedPhone = null;
+    if (phone !== undefined && `${phone}`.trim() !== '') {
+      parsedPhone = `${phone}`.trim();
+      if (!/^[6-9]\d{9}$/.test(parsedPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 10-digit phone number',
+        });
+      }
+      // Kisi doosre account par ye number pehle se ho to saaf batao —
+      // warna Mongo ka unique index E11000 phenkta hai jo user ko
+      // "Internal server error" jaisa dikhta hai.
+      if (parsedPhone !== user.phone) {
+        const taken = await User.findOne({ phone: parsedPhone, _id: { $ne: user._id } }).select('_id');
+        if (taken) {
+          return res.status(409).json({
+            success: false,
+            message: 'This phone number is already registered with another account',
+          });
+        }
+      }
+    }
+    if (!parsedPhone && !user.phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
 
 
     if ((workStateID && !workCityID) || (!workStateID && workCityID)) {
@@ -1516,6 +1552,7 @@ exports.createVendorProfile = async (req, res) => {
     if (workArea) user.workArea = workArea.trim();
     if (gstNumber) user.gstNumber = gstNumber;
     if (whatsappNumber) user.whatsappNumber = whatsappNumber;
+    if (parsedPhone) user.phone = parsedPhone;
     if (website) user.website = website.trim();
     if (panNumber) user.panNumber = panNumber;
     user.userType = 'vendor';
