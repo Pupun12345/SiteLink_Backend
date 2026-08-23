@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getCommunityFeed,
   getMyPosts,
+  getPostsByUser,
   getPostById,
   createPost,
   likeUnlikePost,
@@ -23,6 +24,10 @@ router.get('/feed', protect, getCommunityFeed);
 router.get('/posts/mine', protect, getMyPosts);
 
 // GET ek single post — shared deep link kholne par app isi ko call karti hai
+// NOTE: ye ':postId' route se PEHLE hona chahiye, warna 'user' ko
+// postId samajh liya jayega.
+router.get('/posts/user/:userId', protect, getPostsByUser);
+
 router.get('/posts/:postId', protect, getPostById);
 
 // POST create post

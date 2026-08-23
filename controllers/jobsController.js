@@ -1089,6 +1089,11 @@ function _formatApplicant(application) {
       ratedJobsCount: _workerRatingVisible(w) ? (w.ratedJobsCount || 0) : null,
       // Admin ka manual rating alag hai — mila mat do.
       adminRating: w.adminRating != null ? w.adminRating : null,
+      // Registration me diye gaye documents — vendor applicant ko theek se
+      // parakh sake. Paths hain; app inhe media base URL ke saath jodti hai.
+      governmentID: w.governmentID || null,
+      experienceCertificate: w.experienceCertificate || null,
+      workSamplesPhoto: w.workSamplesPhoto || [],
     },
     coverLetter: application.coverLetter || null,
     experience: w.experience || null,
@@ -1122,7 +1127,7 @@ exports.getJobApplicants = async (req, res) => {
     }
 
     const applications = await Application.find({ job: id })
-      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating rating jobsCompleted ratedJobsCount subscriptionStatus subscriptionExpiresAt')
+      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating rating jobsCompleted ratedJobsCount subscriptionStatus subscriptionExpiresAt governmentID experienceCertificate workSamplesPhoto')
       .sort({ createdAt: -1 })
       .lean();
 

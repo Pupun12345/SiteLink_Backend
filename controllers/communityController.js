@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+// getPostsByUser ke access check ke liye — vendor sirf apne applicants
+// ke posts dekh sakta hai.
+const Job = require('../models/job');
+const Application = require('../models/Application');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription } = require('../utils/subscription');
 
@@ -234,6 +238,79 @@ exports.getMyPosts = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching your posts',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Ek user ke public posts — vendor applicant ko parakhne ke liye
+//          uske community posts dekh sakta hai.
+// @route   GET /api/community/posts/user/:userId
+// @access  Private (vendor jisko us user ne apply kiya ho, ya admin)
+//
+// Access jaan-boojh kar tight hai: koi bhi kisi ke bhi posts nahi dekh
+// sakta. Sirf wahi vendor dekh sakta hai jiski kisi job par is user ne
+// apply kiya hai — yani vendor ka usse asli lena-dena hai. Apne posts
+// dekhne ke liye `/posts/mine` hai.
+exports.getPostsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const isSelf = req.user.id.toString() === userId;
+    let allowed = isSelf || req.user.userType === 'admin';
+
+    if (!allowed && req.user.userType === 'vendor') {
+      // Is user ne is vendor ki kisi job par apply kiya hai?
+      const myJobIds = await Job.find({ postedBy: req.user.id }).distinct('_id');
+      allowed = myJobIds.length > 0 &&
+        !!(await Application.exists({ job: { $in: myJobIds }, applicant: userId }));
+    }
+
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only view posts of workers who applied to your jobs',
+      });
+    }
+
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+
+    // Doosre ka profile dekh rahe hain, isliye sirf live posts — pending
+    // ya deactivated posts sirf owner ko dikhni chahiye.
+    const filter = isSelf
+      ? { postedBy: userId }
+      : { postedBy: userId, isActive: true, approvalStatus: 'approved' };
+
+    const [posts, total] = await Promise.all([
+      Post.find(filter)
+        .populate('postedBy',
+          'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount subscriptionStatus subscriptionExpiresAt')
+        .populate('likes.userId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: posts.map((p) => formatPost(p, { viewerId: req.user.id })),
+      pagination: {
+        current: page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching posts',
       error: error.message,
     });
   }
