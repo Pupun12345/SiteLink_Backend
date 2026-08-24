@@ -1052,10 +1052,11 @@ exports.getProfile = async (req, res) => {
         totalExperience: regularUser.experience,
         experienceDescription: regularUser.experienceDescription,
         gender: regularUser.gender,
-        // Automatic performance rating (job outcomes se). 0 = naya worker.
-        rating: regularUser.rating || 0,
-        jobsCompleted: regularUser.jobsCompleted || 0,
-        ratedJobsCount: regularUser.ratedJobsCount || 0,
+        // Rating SIRF admin deta hai (admin panel se). Automatic wali
+        // rating (job outcomes se) poori hata di gayi hai.
+        // null = abhi admin ne rating nahi di.
+        rating: regularUser.adminRating ?? null,
+        ratingComment: regularUser.adminRatingComment || null,
         willingtoRelocate: regularUser.willingtoRelocate,
         salaryType: regularUser.salaryType,
         salary: regularUser.salary,

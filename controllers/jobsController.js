@@ -6,7 +6,6 @@ const mongoose = require('mongoose');
 const Amenity = require('../models/amenities');
 const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
-const { recalculateWorkerRating } = require('../utils/workerRating');
 const { hasActiveSubscription, subscriptionRequired } = require('../utils/subscription');
 
 // Total workers a vendor has already committed across their jobs. Deactivated
@@ -1071,24 +1070,22 @@ function _formatApplicant(application) {
       workCity: w.city || null,
       workState: w.workState || null,
       isVerified: w.isVerified === true,
-      // Automatic performance rating — job outcomes se calculate hoti hai.
-      // 0 = naya worker (abhi koi job complete nahi ki); app ise "New"
-      // dikhata hai, 0 stars nahi.
+      // Rating SIRF admin deta hai (admin panel se). Pehle ye job
+      // outcomes se automatically banti thi — wo poora system hata diya
+      // gaya, kyunki kaam poora hua ya nahi, ye platform ka mamla nahi
+      // hai. Platform ka kaam yahin khatam: vendor ne job post ki,
+      // worker ne apply kiya, vendor ne confirm kiya.
       //
       // PAID PERK: rating vendor ko dikhna worker plan ka feature hai
-      // ("Skill Rating & Verification — prioritized shortlisting by top
-      // contractors"). Plan na ho to null jaata hai aur app rating wali
-      // jagah kuch nahi dikhati. Worker apni rating apni profile me
-      // hamesha dekh sakta hai.
+      // ("Skill Rating & Verification"). Plan na ho to null jaata hai aur
+      // app rating wali jagah kuch nahi dikhati. Worker apni rating apni
+      // profile me hamesha dekh sakta hai.
       rating: _workerRatingVisible(w)
-        ? (typeof w.rating === 'number' ? w.rating : 0)
+        ? (w.adminRating != null ? w.adminRating : null)
         : null,
-      jobsCompleted: w.jobsCompleted || 0,
-      // Rating kitni jobs par bani hai — vendor samajh sake ki number
-      // kitna bharosemand hai (4.5 on 2 jobs vs 4.5 on 40 jobs).
-      ratedJobsCount: _workerRatingVisible(w) ? (w.ratedJobsCount || 0) : null,
-      // Admin ka manual rating alag hai — mila mat do.
-      adminRating: w.adminRating != null ? w.adminRating : null,
+      ratingComment: _workerRatingVisible(w)
+        ? (w.adminRatingComment || null)
+        : null,
       // Registration me diye gaye documents — vendor applicant ko theek se
       // parakh sake. Paths hain; app inhe media base URL ke saath jodti hai.
       governmentID: w.governmentID || null,
@@ -1098,8 +1095,6 @@ function _formatApplicant(application) {
     coverLetter: application.coverLetter || null,
     experience: w.experience || null,
     status: application.status,
-    // Vendor UI ko pata chale ki is worker ka outcome already mark hai
-    outcome: application.outcome || null,
     createdAt: application.createdAt,
   };
 }
@@ -1127,7 +1122,7 @@ exports.getJobApplicants = async (req, res) => {
     }
 
     const applications = await Application.find({ job: id })
-      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating rating jobsCompleted ratedJobsCount subscriptionStatus subscriptionExpiresAt governmentID experienceCertificate workSamplesPhoto')
+      .populate('applicant', 'name profileImage primarySkill skills experience phone city workState isVerified adminRating adminRatingComment subscriptionStatus subscriptionExpiresAt governmentID experienceCertificate workSamplesPhoto')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -1195,91 +1190,6 @@ exports.updateApplicantStatus = async (req, res) => {
   }
 };
 
-// @desc    Kaam khatam hone par vendor batata hai ki hire kiye worker ne
-//          job poori ki, beech me chhodi, ya aaya hi nahi. Ye RATING NAHI
-//          hai — sirf fact. Worker ki rating inhi outcomes se automatically
-//          recalculate hoti hai (utils/workerRating.js).
-// @route   PUT /api/jobs/:id/applicants/:applicationId/outcome
-// @access  Private (job ka owner vendor, ya admin)
-exports.updateApplicantOutcome = async (req, res) => {
-  try {
-    const { id, applicationId } = req.params;
-    const { outcome } = req.body;
-
-    const allowed = ['completed', 'left_early', 'no_show'];
-    if (!allowed.includes(outcome)) {
-      return res.status(400).json({
-        success: false,
-        message: `outcome must be one of: ${allowed.join(', ')}`,
-      });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id) ||
-        !mongoose.Types.ObjectId.isValid(applicationId)) {
-      return res.status(400).json({ success: false, message: 'Invalid Job ID or Application ID' });
-    }
-
-    const job = await Job.findById(id).select('postedBy title');
-    if (!job) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
-    }
-
-    const isOwner = job.postedBy?.toString() === req.user.id;
-    const isAdmin = req.user.userType === 'admin';
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this application',
-      });
-    }
-
-    const application = await Application.findOne({ _id: applicationId, job: id });
-    if (!application) {
-      return res.status(404).json({ success: false, message: 'Application not found for this job' });
-    }
-
-    // Sirf us worker ka outcome mark hota hai jise vendor ne rakha ho —
-    // warna reject kiye applicants ko bhi no_show mark karke koi unki
-    // rating gira sakta hai.
-    if (!['confirmed', 'hired'].includes(application.status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Outcome can only be set for a confirmed or hired applicant',
-      });
-    }
-
-    application.outcome = outcome;
-    application.outcomeAt = new Date();
-    await application.save();
-
-    // Rating dobara calculate — fail ho to bhi request safal maano,
-    // outcome to save ho hi chuka hai (agli baar sahi ho jaayegi).
-    const rating = await recalculateWorkerRating(application.applicant);
-
-    if (outcome === 'completed') {
-      notifyUser(application.applicant, {
-        type: 'application_status',
-        title: 'Job completed',
-        body: `"${job.title}" complete mark ho gayi. Aapki rating update ho gayi hai.`,
-        data: { jobId: job._id.toString(), applicationId: application._id.toString() },
-      }).catch((e) => console.error('[updateApplicantOutcome] notifyUser failed:', e.message));
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Outcome recorded',
-      data: {
-        outcome,
-        // App turant nayi rating dikha sake, dobara fetch kiye bina
-        rating: rating?.rating ?? null,
-        jobsCompleted: rating?.jobsCompleted ?? null,
-        ratedJobsCount: rating?.ratedJobsCount ?? null,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 
 exports.fetchAllAmenities = async (req, res) => {
   try {

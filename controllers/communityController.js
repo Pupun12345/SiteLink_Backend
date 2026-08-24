@@ -25,33 +25,27 @@ function posterAvatar(post, author) {
   return post.posterImage || author?.profileImage || null;
 }
 
-// Worker ki performance rating — feed me naam ke baad dikhti hai, jaise
-// vendor ke naam ke baad verified badge.
+// Worker ki rating — feed me naam ke baad dikhti hai, jaise vendor ke
+// naam ke baad verified badge.
 //
-// Ye LIVE bhejte hain, snapshot nahi: rating job outcomes se badalti
-// rehti hai (utils/workerRating.js), isliye purani post par bhi aaj ki
-// rating dikhni chahiye.
+// Rating SIRF admin deta hai (admin panel se). Pehle ye job outcomes se
+// automatically banti thi — wo poora system hata diya gaya, kyunki kaam
+// poora hua ya nahi ye platform ka mamla nahi hai.
 //
-// `ratedJobsCount` saath jaata hai kyunki app 0 par "New" dikhati hai,
-// "0.0 ★" nahi — naye worker ko 0 stars dikhana galat signal hai.
-// Vendor/admin par null (unki rating hi nahi hoti).
+// LIVE bhejte hain, snapshot nahi: admin kabhi bhi rating badal sakta
+// hai, isliye purani post par bhi aaj ki rating dikhni chahiye.
+//
+// `null` = abhi rating nahi mili (ya plan nahi hai). App tab kuch nahi
+// dikhati — 0 stars dikhana galat signal hota.
 //
 // PAID PERK: rating DOOSRON ko dikhna worker plan ka feature hai ("Skill
-// Rating & Verification — leading to prioritized shortlisting by top
-// contractors"). Plan na ho to null jaata hai aur app kuch nahi dikhati.
-// Worker khud apni rating hamesha dekh sakta hai (apna data chhupana
-// bekaar hai) — uske liye `isSelf: true` pass karo.
+// Rating & Verification"). Plan na ho to null jaata hai. Worker khud apni
+// rating hamesha dekh sakta hai (apna data chhupana bekaar hai) — uske
+// liye `isSelf: true` pass karo.
 function posterRatingFields(post, author, { isSelf = false } = {}) {
-  if (post.posterType !== 'worker') {
-    return { posterRating: null, posterRatedJobsCount: null };
-  }
-  if (!isSelf && !hasActiveSubscription(author)) {
-    return { posterRating: null, posterRatedJobsCount: null };
-  }
-  return {
-    posterRating: author?.rating ?? 0,
-    posterRatedJobsCount: author?.ratedJobsCount ?? 0,
-  };
+  if (post.posterType !== 'worker') return { posterRating: null };
+  if (!isSelf && !hasActiveSubscription(author)) return { posterRating: null };
+  return { posterRating: author?.adminRating ?? null };
 }
 
 // Feed, myPosts aur single-post — teeno ek hi shape bhejte hain, warna
@@ -289,7 +283,7 @@ exports.getPostsByUser = async (req, res) => {
     const [posts, total] = await Promise.all([
       Post.find(filter)
         .populate('postedBy',
-          'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount subscriptionStatus subscriptionExpiresAt')
+          'name profileImage companyLogo designation primarySkill companyName adminRating subscriptionStatus subscriptionExpiresAt')
         .populate('likes.userId', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -429,7 +423,7 @@ exports.getPostById = async (req, res) => {
         'postedBy',
         // companyLogo — vendor ka avatar isi se banta hai (posterAvatar).
         // rating/ratedJobsCount — worker ka rating badge (posterRatingFields).
-        'name profileImage companyLogo designation primarySkill companyName rating ratedJobsCount subscriptionStatus subscriptionExpiresAt'
+        'name profileImage companyLogo designation primarySkill companyName adminRating subscriptionStatus subscriptionExpiresAt'
       )
       .populate('likes.userId', 'name');
 
