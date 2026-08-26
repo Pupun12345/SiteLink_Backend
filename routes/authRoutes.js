@@ -14,6 +14,7 @@ const {
   rejectVendor,
   vendorForgotPassword,
   vendorResetPassword,
+  deleteAccount,
 } = require('../controllers/authController');
 const { protect, requireAdmin } = require('../middleware/auth');
 const { otpRequestLimiter, authLimiter } = require('../middleware/rateLimiter');
@@ -59,5 +60,6 @@ router.put('/admin/vendors/:id/reject', protect, requireAdmin, rejectVendor);
 // ---- Common private routes ----
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
+router.delete('/delete-account', deleteAccount);
 
 module.exports = router;

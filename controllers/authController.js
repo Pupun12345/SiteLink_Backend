@@ -637,3 +637,44 @@ exports.vendorResetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Delete account (by authenticated user or by identifier)
+// @route   DELETE /api/auth/delete-account
+// @access  Public
+exports.deleteAccount = async (req, res) => {
+  try {
+    const { identifier } = req.body;
+
+    if (!identifier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your registered phone number or email address.',
+      });
+    }
+
+    const isEmail = identifier.includes('@');
+    const query = isEmail ? { email: identifier.toLowerCase() } : { phone: identifier };
+    const user = await User.findOne(query);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with the provided details.',
+      });
+    }
+
+    await user.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your SiteLink account has been deleted successfully.',
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to delete the account. Please try again later.',
+    });
+  }
+};
+
