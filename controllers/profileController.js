@@ -1295,7 +1295,8 @@ exports.createWorkerProfile = async (req, res) => {
     }
 
     if (req.files.experienceCertificate) {
-      user.experienceCertificate = req.files.experienceCertificate[0].path;
+      user.experienceCertificate =
+        req.files.experienceCertificate.map((f) => f.path);
     }
 
     // Mandatory field
@@ -1455,8 +1456,39 @@ exports.editWorkerProfile = async (req, res) => {
         user.profileImage = req.files.profileImage[0].path;
       }
       if (req.files.workSamplesPhoto) user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
-      if (req.files.experienceCertificate) user.experienceCertificate = req.files.experienceCertificate[0].path;
       if (req.files.governmentID) user.governmentID = req.files.governmentID[0].path;
+    }
+
+    // ── Experience certificates (multiple) ────────────────────────────
+    // Edit me sirf naye files bhejna kaafi nahi: aisa karne par purane
+    // certificates chup-chaap gayab ho jaate. Isliye app poori "final
+    // list" batati hai — `keepExperienceCertificate` me wo purane paths
+    // jo user ne rakhe, aur naye files upload karke.
+    //
+    // Final = rakhe hue + naye. `keepExperienceCertificate` bheja hi na
+    // ho aur naye files bhi na hon, to field chhui hi nahi jaati.
+    {
+      const added = (req.files?.experienceCertificate || []).map((f) => f.path);
+      const keepRaw = req.body.keepExperienceCertificate;
+
+      if (keepRaw !== undefined || added.length) {
+        let kept = [];
+        if (keepRaw !== undefined) {
+          try {
+            const parsed = typeof keepRaw === 'string' ? JSON.parse(keepRaw) : keepRaw;
+            kept = Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string' && p) : [];
+          } catch {
+            return res.status(400).json({
+              success: false,
+              message: 'keepExperienceCertificate must be a JSON array of paths',
+            });
+          }
+        } else {
+          // Sirf naye files aaye — purane jaise the waise rakho.
+          kept = user.experienceCertificate || [];
+        }
+        user.experienceCertificate = [...kept, ...added];
+      }
     }
 
     if (!user.governmentID) {

@@ -85,7 +85,14 @@ const userSchema = new mongoose.Schema({
   salaryType: { type: String, enum: ['daily', 'weekly', 'monthly', 'hourly', 'project-based'], default: null },
   salary: { type: Number, default: null },
   governmentID: { type: String, default: null },
-  experienceCertificate: { type: String, default: null },
+  // Worker ek se zyada certificate laga sakta hai (alag-alag company /
+  // alag-alag skill ka), isliye array hai.
+  //
+  // NOTE: pehle ye single String tha. Purane users ke DB me abhi bhi
+  // string padi hai — Mongoose array path par scalar value ko apne aap
+  // ek-element array me cast kar deta hai, isliye purana data padhne me
+  // toota nahi.
+  experienceCertificate: { type: [String], default: [] },
   workSamplesPhoto: { type: [String], default: [] },
   age: {
     type: Number,

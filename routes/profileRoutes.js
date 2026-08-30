@@ -38,7 +38,9 @@ const customerUpload = upload.fields([
 const workerUpload = upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'workSamplesPhoto', maxCount: 5 },
-  { name: 'experienceCertificate', maxCount: 1 },
+  // Ek se zyada certificate allowed — worker alag-alag company ke
+  // certificates laga sakta hai.
+  { name: 'experienceCertificate', maxCount: 5 },
   { name: 'governmentID', maxCount: 1 },
 ]);
 
