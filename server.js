@@ -21,7 +21,16 @@ app.use(trackApiRequest);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// `verify` hook raw request body ko sambhal ke rakh deta hai. Razorpay
+// webhook ki signature RAW bytes par banti hai — parsed JSON ko dobara
+// stringify karke verify karna kaam nahi karta (key order aur whitespace
+// badal jaate hain). Sirf webhook route ke liye rakhte hain taaki baaki
+// requests par memory waste na ho.
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    if (req.originalUrl.includes('/payments/webhook')) req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (uploaded images)

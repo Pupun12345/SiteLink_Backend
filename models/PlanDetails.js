@@ -39,6 +39,14 @@ const planDetailsSchema = new mongoose.Schema({
         default: 0,
         min: 0,
     },
+    // Razorpay ka Plan id (auto-payment ke liye). Razorpay par
+    // subscription banane se pehle wahan ek Plan hona zaroori hai.
+    // Pehli baar auto-pay subscribe hone par backend khud bana ke yahan
+    // save kar deta hai — admin ko manually kuch nahi karna.
+    razorpayPlanId: {
+        type: String,
+        default: null,
+    },
     isActive: {
         type: Boolean,
         default: true,

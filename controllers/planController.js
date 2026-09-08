@@ -26,6 +26,7 @@ async function currentSubscription(user) {
             status: expiresAt ? 'expired' : 'none',
             planId,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
+            autoRenew: false,
         };
     }
 
@@ -54,7 +55,12 @@ async function currentSubscription(user) {
         expiresAt: expiresAt.toISOString(),
         daysRemaining,
         // 7 din ya kam bache to app amber "renew soon" state dikhati hai.
-        expiringSoon: daysRemaining <= 7,
+        // Auto-pay chalu ho to nahi — paise khud kat jayenge, user ko
+        // bekaar me "renew karo" nahi bolna chahiye.
+        expiringSoon: daysRemaining <= 7 && !user.autoRenew,
+        // Auto-payment chalu hai? App isi se "Auto-renews" badge aur
+        // "Cancel auto-payment" button dikhati hai.
+        autoRenew: !!user.autoRenew,
     };
 }
 
@@ -116,6 +122,9 @@ exports.editPlanAmount = async (req, res) => {
         const plan = await planDetails.findById(id);
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
 
+        const originalAmount = plan.amount;
+        const originalFrequency = plan.frequency;
+
         if (planName !== undefined) plan.planName = planName.trim();
         if (userType !== undefined) plan.userType = userType;
         if (planType !== undefined) plan.planType = planType;
@@ -125,6 +134,15 @@ exports.editPlanAmount = async (req, res) => {
         // hi quota chup-chaap 0 (unlimited) reh jaata tha.
         if (maxWorkers !== undefined) plan.maxWorkers = Math.max(0, parseInt(maxWorkers, 10) || 0);
         if (features !== undefined) plan.features = Array.isArray(features) ? features.filter(f => f.trim()) : [];
+
+        // Razorpay par plan ka amount/frequency EDIT nahi hota. Yahan
+        // amount ya frequency badla hai to purana razorpayPlanId galat ho
+        // gaya — use hataa dete hain, agli auto-pay par naya ban jayega.
+        // Warna auto-pay purani keemat par charge karta rehta.
+        const priceChanged =
+            (amount !== undefined && parseFloat(amount) !== originalAmount) ||
+            (frequency !== undefined && frequency !== originalFrequency);
+        if (priceChanged) plan.razorpayPlanId = null;
 
         await plan.save();
         return res.status(200).json({ success: true, message: 'Plan updated successfully', data: plan });

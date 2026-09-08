@@ -16,6 +16,25 @@ const subscriptionSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'expired', 'cancelled'],
     default: 'active',
   },
+  // ── Auto-payment (Razorpay Subscriptions) ────────────────────────
+  // `isRecurring: false` = ek baar ka payment (purana flow). true =
+  // Razorpay har cycle par khud charge karta hai.
+  isRecurring: {
+    type: Boolean,
+    default: false,
+  },
+  razorpaySubscriptionId: {
+    type: String,
+    default: null,
+    index: true,
+  },
+  // User ne auto-pay band kiya? Razorpay par turant cancel ho jaata
+  // hai par current cycle ke end tak plan chalta rehta hai — isliye
+  // ye `status` se alag field hai.
+  autoRenewCancelledAt: {
+    type: Date,
+    default: null,
+  },
   startDate: {
     type: Date,
     default: Date.now,

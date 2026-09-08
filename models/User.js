@@ -220,6 +220,21 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // ── Auto-payment (Razorpay Subscriptions) ──────────────────────
+  // Ye set hone ka matlab hai ki plan auto-renew par hai: Razorpay
+  // har cycle khud charge karta hai. null = ek baar ka payment tha.
+  razorpaySubscriptionId: {
+    type: String,
+    default: null,
+    index: true,
+  },
+  // User ne auto-pay band kar diya. Plan current cycle ke end tak
+  // chalta rehta hai (subscriptionExpiresAt tak), bas aage renew nahi
+  // hoga — isliye ye subscriptionStatus se alag field hai.
+  autoRenew: {
+    type: Boolean,
+    default: false,
+  },
   lastPaymentId: {
     type: String,
     default: null,
