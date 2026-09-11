@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Skill = require('../models/Skill');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
+const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription } = require('../utils/subscription');
 
@@ -1713,15 +1714,20 @@ exports.sendPhoneChangeOtp = async (req, res) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const otp = isProduction ? generateOTP() : '123456';
 
+    // OTP NAYE number par jaata hai — wahi to prove karna hai ki number
+    // user ka hai. SMS pehle, DB baad me: fail hone par pendingPhone
+    // set nahi hona chahiye.
+    const sms = await sendOtpSms(newPhone, otp);
+    if (!sms.sent) {
+      return res.status(502).json({ success: false, message: sms.message });
+    }
+
     user.pendingPhone = newPhone;
     user.otp = otp;
     user.otpExpire = getOTPExpiry();
     user.otpAttempts = 0;
     await user.save();
 
-    if (!isProduction) console.log(`[DEV ONLY] Phone-change OTP for +91${newPhone}: ${otp}`);
-
-    // TODO: send `otp` via a real SMS provider in production.
     res.status(200).json({
       success: true,
       message: 'OTP sent to +91' + newPhone,

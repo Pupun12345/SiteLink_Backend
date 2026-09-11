@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { sendTokenResponse } = require('../utils/tokenUtils');
 const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
+const { sendOtpSms } = require('../utils/sendOtpSms');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
 const admin = require('../config/firebase');
@@ -28,7 +29,6 @@ exports.register = async (req, res) => {
         : "123456";
     const otpExpire = getOTPExpiry();
 
-    // TODO: integrate a real SMS provider and send `otp` there instead of exposing it here.
     const isProduction = process.env.NODE_ENV === 'production';
 
     const existingUser = await User.findOne({ phone });
@@ -41,11 +41,18 @@ exports.register = async (req, res) => {
     }
 
     if (existingUser) {
+      // SMS pehle bhejo, DB baad me. Ulta karne par naya OTP save ho
+      // jaata hai aur user aise SMS ka intezaar karta rehta jo aata hi
+      // nahi — saath me purana kaam-karta OTP bhi overwrite ho chuka hota.
+      const sms = await sendOtpSms(phone, otp);
+      if (!sms.sent) {
+        return res.status(502).json({ success: false, message: sms.message });
+      }
+
       existingUser.otp = otp;
       existingUser.otpExpire = otpExpire;
       existingUser.otpAttempts = 0;
       await existingUser.save();
-      if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
       return res.status(200).json({
         success: true,
@@ -54,8 +61,14 @@ exports.register = async (req, res) => {
       });
     }
 
+    const sms = await sendOtpSms(phone, otp);
+    if (!sms.sent) {
+      // User abhi bana nahi hai — SMS fail hone par create hi mat karo,
+      // warna adha-adhoora unverified account pada reh jaata hai.
+      return res.status(502).json({ success: false, message: sms.message });
+    }
+
     const user = await User.create({ phone, otp, otpExpire, otpAttempts: 0, isPhoneVerified: false });
-    if (!isProduction) console.log(`[DEV ONLY] OTP for +91${phone}: ${otp}`);
 
     res.status(200).json({
       success: true,
@@ -99,14 +112,16 @@ exports.resendOtp = async (req, res) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const otp = isProduction ? generateOTP() : '123456';
 
+    const sms = await sendOtpSms(phone, otp);
+    if (!sms.sent) {
+      return res.status(502).json({ success: false, message: sms.message });
+    }
+
     user.otp = otp;
     user.otpExpire = getOTPExpiry();
     user.otpAttempts = 0;
     await user.save();
 
-    if (!isProduction) console.log(`[DEV ONLY] Resent OTP for +91${phone}: ${otp}`);
-
-    // TODO: send `otp` via a real SMS provider in production.
     res.status(200).json({
       success: true,
       message: 'OTP resent to +91' + phone,
@@ -563,14 +578,16 @@ exports.vendorForgotPassword = async (req, res, next) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const otp = isProduction ? generateOTP() : '123456';
 
+    const sms = await sendOtpSms(phone, otp);
+    if (!sms.sent) {
+      return res.status(502).json({ success: false, message: sms.message });
+    }
+
     user.otp = otp;
     user.otpExpire = getOTPExpiry();
     user.otpAttempts = 0;
     await user.save();
 
-    if (!isProduction) console.log(`[DEV ONLY] Password-reset OTP for +91${phone}: ${otp}`);
-
-    // TODO: send `otp` via a real SMS provider in production.
     res.status(200).json({
       success: true,
       message: 'OTP sent to +91' + phone,
