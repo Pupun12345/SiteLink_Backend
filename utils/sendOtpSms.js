@@ -24,12 +24,14 @@ function isProduction() {
   return process.env.NODE_ENV === 'production';
 }
 
-/// Sirf authkey zaroori hai. `MSG91_TEMPLATE_ID` optional hai — account
-/// par default OTP template set ho to MSG91 usi se bhej deta hai (is
-/// account par yahi setup hai, live test se confirm kiya). Ek se zyada
-/// template use karne ho tabhi env var set karna padega.
+/// Dono zaroori maante hain.
+///
+/// `MSG91_TEMPLATE_ID` isliye ki India me DLT ke tehat SMS ek approved
+/// template se match hona chahiye — warna operator use chup-chaap drop
+/// kar deta hai. MSG91 tab bhi "success" hi lautata hai (neeche dekho),
+/// isliye ye galti pakadna mushkil hai: API khush, phone khaali.
 function msg91Configured() {
-  return !!process.env.MSG91_AUTH_KEY;
+  return !!process.env.MSG91_AUTH_KEY && !!process.env.MSG91_TEMPLATE_ID;
 }
 
 /// OTP SMS bhejo.
@@ -48,8 +50,8 @@ async function sendOtpSms(phone, otp) {
 
   if (!msg91Configured()) {
     console.error(
-      '[sendOtpSms] MSG91_AUTH_KEY set nahi hai — OTP SMS nahi ja raha. ' +
-      'Production me ye login poori tarah todta hai.'
+      '[sendOtpSms] MSG91_AUTH_KEY / MSG91_TEMPLATE_ID set nahi hain — ' +
+      'OTP SMS nahi ja raha. Production me ye login poori tarah todta hai.'
     );
     return { sent: false, message: 'SMS service is not configured' };
   }
@@ -60,6 +62,7 @@ async function sendOtpSms(phone, otp) {
   const mobile = `91${String(phone).replace(/\D/g, '').slice(-10)}`;
 
   const params = new URLSearchParams({
+    template_id: process.env.MSG91_TEMPLATE_ID,
     mobile,
     otp: String(otp),
     // Hamare DB ki expiry 10 min hai (getOTPExpiry) — dono ek jaisi
@@ -67,12 +70,6 @@ async function sendOtpSms(phone, otp) {
     otp_expiry: '10',
     authkey: process.env.MSG91_AUTH_KEY,
   });
-
-  // Sirf tab bhejo jab explicitly set ho — bina iske MSG91 account ka
-  // default template use karta hai, jo is setup me chahiye bhi wahi hai.
-  if (process.env.MSG91_TEMPLATE_ID) {
-    params.set('template_id', process.env.MSG91_TEMPLATE_ID);
-  }
 
   try {
     const res = await fetch(`${MSG91_BASE}?${params.toString()}`, {
@@ -82,8 +79,18 @@ async function sendOtpSms(phone, otp) {
 
     const body = await res.json().catch(() => ({}));
 
-    // MSG91 galti par bhi HTTP 200 de deta hai — asli status body ke
-    // `type` field me hota hai. Sirf res.ok dekhna galat hai.
+    // SAAVDHAAN: is endpoint ka "success" bharosemand NAHI hai. Ye
+    // request queue karke turant `{"type":"success"}` de deta hai —
+    // testing me ye jaanboojhkar GALAT authkey par bhi success laut
+    // aaya. Yani yahan se ye pata nahi chalta ki SMS gaya ya nahi.
+    //
+    // Asli failures (galat/na-approved template, IP whitelist block,
+    // credits khatam, operator ka drop) sirf MSG91 dashboard ke
+    // delivery logs me dikhte hain. "OTP nahi aaya" ki shikayat par
+    // wahi dekhna hoga — yahan ka log kaafi nahi hai.
+    //
+    // Check phir bhi rakha hai: network/HTTP-level gadbad ye pakad
+    // leta hai, bas iske paas hone ka matlab "deliver ho gaya" nahi.
     if (!res.ok || body.type === 'error') {
       const reason = body.message || `HTTP ${res.status}`;
       console.error(`[sendOtpSms] MSG91 failed for ${mobile}: ${reason}`);
