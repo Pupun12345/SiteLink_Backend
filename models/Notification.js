@@ -31,6 +31,12 @@ const notificationSchema = new mongoose.Schema({
       'worker_verified',
       'worker_rejected',
       'subscription_activated',
+      // Auto-payment (Razorpay Subscriptions). `subscription_renewed`
+      // webhook se aata hai — app khuli hone ki zaroorat nahi, isliye
+      // notification hi ek matra zariya hai user ko batane ka.
+      'subscription_renewed',
+      'autopay_cancelled',
+      'autopay_failed',
       'phone_changed',
       'general',
     ],
