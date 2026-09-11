@@ -24,14 +24,14 @@ function isProduction() {
   return process.env.NODE_ENV === 'production';
 }
 
-/// Dono zaroori maante hain.
+/// Sirf authkey zaroori hai.
 ///
-/// `MSG91_TEMPLATE_ID` isliye ki India me DLT ke tehat SMS ek approved
-/// template se match hona chahiye — warna operator use chup-chaap drop
-/// kar deta hai. MSG91 tab bhi "success" hi lautata hai (neeche dekho),
-/// isliye ye galti pakadna mushkil hai: API khush, phone khaali.
+/// `MSG91_TEMPLATE_ID` optional hai: is account ke OTP Widget me
+/// Channels → SMS par "Use Default Configuration" chuna hua hai (dashboard
+/// me verify kiya gaya), yani koi custom template use nahi ho raha aur
+/// MSG91 default template se bhejta hai. Set karne par hi override hoga.
 function msg91Configured() {
-  return !!process.env.MSG91_AUTH_KEY && !!process.env.MSG91_TEMPLATE_ID;
+  return !!process.env.MSG91_AUTH_KEY;
 }
 
 /// OTP SMS bhejo.
@@ -50,8 +50,8 @@ async function sendOtpSms(phone, otp) {
 
   if (!msg91Configured()) {
     console.error(
-      '[sendOtpSms] MSG91_AUTH_KEY / MSG91_TEMPLATE_ID set nahi hain — ' +
-      'OTP SMS nahi ja raha. Production me ye login poori tarah todta hai.'
+      '[sendOtpSms] MSG91_AUTH_KEY set nahi hai — OTP SMS nahi ja raha. ' +
+      'Production me ye login poori tarah todta hai.'
     );
     return { sent: false, message: 'SMS service is not configured' };
   }
@@ -62,7 +62,6 @@ async function sendOtpSms(phone, otp) {
   const mobile = `91${String(phone).replace(/\D/g, '').slice(-10)}`;
 
   const params = new URLSearchParams({
-    template_id: process.env.MSG91_TEMPLATE_ID,
     mobile,
     otp: String(otp),
     // Hamare DB ki expiry 10 min hai (getOTPExpiry) — dono ek jaisi
@@ -70,6 +69,12 @@ async function sendOtpSms(phone, otp) {
     otp_expiry: '10',
     authkey: process.env.MSG91_AUTH_KEY,
   });
+
+  // Sirf tab bhejo jab explicitly set ho — warna MSG91 widget ki default
+  // SMS configuration use karta hai, jo is account par chuna hua hai.
+  if (process.env.MSG91_TEMPLATE_ID) {
+    params.set('template_id', process.env.MSG91_TEMPLATE_ID);
+  }
 
   try {
     const res = await fetch(`${MSG91_BASE}?${params.toString()}`, {
