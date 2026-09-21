@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const { sendTokenResponse } = require('../utils/tokenUtils');
-const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
+const { generateOTP, getOTPExpiry, DEV_OTP } = require('../utils/otpUtils');
 const { sendOtpSms } = require('../utils/sendOtpSms');
 const { validationResult } = require('express-validator');
 const BlacklistedToken = require('../models/BlacklistedToken');
@@ -26,7 +26,7 @@ exports.register = async (req, res) => {
     const otp =
       process.env.NODE_ENV === "production"
         ? generateOTP()
-        : "123456";
+        : DEV_OTP;
     const otpExpire = getOTPExpiry();
 
     const isProduction = process.env.NODE_ENV === 'production';
@@ -110,7 +110,7 @@ exports.resendOtp = async (req, res) => {
     }
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const otp = isProduction ? generateOTP() : '123456';
+    const otp = isProduction ? generateOTP() : DEV_OTP;
 
     const sms = await sendOtpSms(phone, otp);
     if (!sms.sent) {
@@ -141,6 +141,18 @@ exports.resendOtp = async (req, res) => {
 // @access  Public
 exports.verifyOtp = async (req, res, next) => {
   try {
+    // Route par phoneValidation + otpValidation lagi hai, par unka
+    // nateeja yahan kabhi padha hi nahi jaata tha — validators chalte
+    // the aur chup-chaap ignore ho jaate the. Isliye galat length ka
+    // OTP bhi "Invalid OTP" deta tha, "OTP must be 4 digits" nahi.
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
     const { phone, otp } = req.body;
 
     // Validate phone & OTP
@@ -576,7 +588,7 @@ exports.vendorForgotPassword = async (req, res, next) => {
     }
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const otp = isProduction ? generateOTP() : '123456';
+    const otp = isProduction ? generateOTP() : DEV_OTP;
 
     const sms = await sendOtpSms(phone, otp);
     if (!sms.sent) {

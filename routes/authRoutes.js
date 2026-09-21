@@ -1,5 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
+const { OTP_LENGTH } = require('../utils/otpUtils');
 const {
   register,
   resendOtp,
@@ -26,7 +27,8 @@ const phoneValidation = body('phone')
   .withMessage('Please provide a valid 10-digit phone number');
 
 const otpValidation = body('otp')
-  .isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
+  .isLength({ min: OTP_LENGTH, max: OTP_LENGTH })
+  .withMessage(`OTP must be ${OTP_LENGTH} digits`)
   .isNumeric().withMessage('OTP must contain only numbers');
 
 const emailValidation = body('email')

@@ -1,6 +1,7 @@
+const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const Skill = require('../models/Skill');
-const { generateOTP, getOTPExpiry } = require('../utils/otpUtils');
+const { generateOTP, getOTPExpiry, DEV_OTP } = require('../utils/otpUtils');
 const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription } = require('../utils/subscription');
@@ -1712,7 +1713,7 @@ exports.sendPhoneChangeOtp = async (req, res) => {
     }
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const otp = isProduction ? generateOTP() : '123456';
+    const otp = isProduction ? generateOTP() : DEV_OTP;
 
     // OTP NAYE number par jaata hai — wahi to prove karna hai ki number
     // user ka hai. SMS pehle, DB baad me: fail hone par pendingPhone
@@ -1743,6 +1744,14 @@ exports.sendPhoneChangeOtp = async (req, res) => {
 // @access  Private
 exports.verifyPhoneChangeOtp = async (req, res) => {
   try {
+    // Route par otpValidation lagi hai par uska nateeja yahan padha
+    // nahi jaata tha — validators chal kar chup-chaap ignore ho jaate
+    // the. authController.verifyOtp me bhi yahi baat thi.
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
     const { otp } = req.body;
     if (!otp) {
       return res.status(400).json({ success: false, message: 'Please provide the OTP' });

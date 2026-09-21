@@ -39,7 +39,7 @@ function msg91Configured() {
 /// Returns `{ sent: boolean, message: string }` — throw nahi karta,
 /// taaki caller khud decide kar sake ki fail hone par kya karna hai.
 ///
-/// Development me kuch nahi bheja jaata: OTP `123456` fix hai aur API
+/// Development me kuch nahi bheja jaata: OTP fix hai (`DEV_OTP`) aur API
 /// response me hi aa jaata hai, isliye SMS credits jalane ka matlab
 /// nahi. Ye chup-chaap `sent: true` lautata hai.
 async function sendOtpSms(phone, otp) {
