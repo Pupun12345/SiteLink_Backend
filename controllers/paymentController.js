@@ -591,10 +591,53 @@ exports.razorpayWebhook = async (req, res) => {
     switch (event) {
       // Har successful auto-charge — yahi renewal hai.
       case 'subscription.charged': {
-        const expiry = addCycle(new Date(), plan?.frequency || 'monthly');
+        const payEntity = req.body?.payload?.payment?.entity;
+
+        // ── Idempotency ────────────────────────────────────────────
+        // Razorpay wahi event dobara bhejta hai (retry, ya timeout ke
+        // baad). Payment.orderId unique hai, isliye usi ko idempotency
+        // key bana rahe hain: duplicate insert 11000 se fail hota hai
+        // aur hum poora renewal chhod dete hain.
+        //
+        // Iske bina dobara aaye event par expiry do baar aage badh
+        // jaati aur user ko muft ka extra cycle mil jaata.
+        const chargeKey = payEntity?.order_id || payEntity?.id;
+        if (chargeKey && user.activePlan) {
+          try {
+            await Payment.create({
+              user: user._id,
+              plan: user.activePlan,
+              orderId: chargeKey,
+              paymentId: payEntity?.id || null,
+              amount: payEntity?.amount ??
+                Math.round(Number(plan?.amount || 0) * 100),
+              currency: payEntity?.currency || 'INR',
+              status: 'paid',
+            });
+          } catch (e) {
+            if (e.code === 11000) {
+              return res.status(200).json({ success: true, duplicate: true });
+            }
+            throw e;
+          }
+        }
+
+        // Expiry Razorpay ke apne `current_end` se lete hain, apne
+        // hisaab se nahi. Do fayde: hamari tareekh Razorpay ke billing
+        // cycle se match karti hai, aur event dobara aane par wahi
+        // value set hoti hai — ye khud idempotent hai, jabki "abhi se
+        // ek cycle" har baar aage khisak jaata.
+        const expiry = subEntity?.current_end
+          ? new Date(subEntity.current_end * 1000)
+          : addCycle(new Date(), plan?.frequency || 'monthly');
+
         user.subscriptionStatus = 'active';
         user.subscriptionExpiresAt = expiry;
         user.subscription = true;
+        // Charge safal hua matlab mandate zinda hai. Pehle koi charge
+        // fail hone par autoRenew false hua tha, to yahan wapas sahi
+        // ho jaata hai.
+        user.autoRenew = true;
         await user.save();
 
         if (user.subscriptionId) {
