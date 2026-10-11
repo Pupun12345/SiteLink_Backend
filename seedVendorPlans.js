@@ -4,8 +4,12 @@
 // Vendor ke do plans set karta hai — worker quota MAHINE ka hota hai
 // (har mahine ki 1 taarikh ko reset).
 //
-//   Basic     ₹2,999/month   25 workers/month
-//   Standard  ₹4,999/month   50 workers/month
+//   Standard  ₹2,999/month   25 workers/month   (planType: basic)
+//   Premium   ₹4,999/month   50 workers/month   (planType: premium)
+//
+// Naam aur features app ki Vendor Plans screen se milte hain. Naam
+// isliye matter karta hai ki payment notification aur plan banner me
+// yahi `planName` dikhta hai.
 //
 // Idempotent hai: plan pehle se ho to uska amount/maxWorkers update kar
 // deta hai, duplicate nahi banata. Isliye rates badalne par bhi yahi
@@ -20,33 +24,36 @@ const PlanDetails = require('./models/PlanDetails');
 
 const PLANS = [
   {
-    planName: 'Basic Plan',
+    planName: 'Standard Plan',
     userType: 'vendor',
     planType: 'basic',
     frequency: 'monthly',
     amount: 2999,
     maxWorkers: 25,
     features: [
-      'Post up to 25 workers per month',
-      'Access to verified employees',
-      'Applicant ratings & profiles',
-      'Standard support',
+      'Hire up to 25 workers per month',
+      'Access to verified workers',
+      'Job posting facility',
+      'Call & WhatsApp support',
     ],
     isActive: true,
   },
   {
-    planName: 'Standard Plan',
+    planName: 'Premium Plan',
     userType: 'vendor',
     planType: 'premium',
     frequency: 'monthly',
     amount: 4999,
     maxWorkers: 50,
     features: [
-      'Post up to 50 workers per month',
-      'Access to verified & skilled employees',
-      'Priority applicant shortlisting',
-      'Emergency replacement support',
-      'Dedicated support',
+      'Hire up to 50 workers per month',
+      'Priority job listing',
+      'Social media promotion',
+      'Community marketing',
+      'Emergency worker replacement (48h)',
+      'Access to verified & skilled workers',
+      'Dedicated call & WhatsApp support',
+      'Priority customer support',
     ],
     isActive: true,
   },
