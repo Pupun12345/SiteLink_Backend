@@ -73,6 +73,9 @@ const userSchema = new mongoose.Schema({
   },
   experience: { type: String, default: null },
   experienceDescription: { type: String, default: null },
+  // Worker ka nominee — ₹50,000 Family Protection ka claim isi naam par
+  // banta hai. Purane workers ke paas nahi hoga, isliye null allowed.
+  nomineeName: { type: String, trim: true, maxlength: 100, default: null },
   workState: { type: String, default: null },
   city: {
     type: String,

@@ -1053,6 +1053,7 @@ exports.getProfile = async (req, res) => {
         // `totalExperience` naam se bhejti/padhti hai — wahi naam wapas do.
         totalExperience: regularUser.experience,
         experienceDescription: regularUser.experienceDescription,
+        nomineeName: regularUser.nomineeName || null,
         gender: regularUser.gender,
         // Rating SIRF admin deta hai (admin panel se). Automatic wali
         // rating (job outcomes se) poori hata di gayi hai.
@@ -1190,7 +1191,7 @@ exports.createWorkerProfile = async (req, res) => {
       user.city = workCity;
     }
 
-    const { name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location } = req.body;
+    const { name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, nomineeName } = req.body;
 
     if (dateOfBirth) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1260,6 +1261,17 @@ exports.createWorkerProfile = async (req, res) => {
       }
       user.experienceDescription = experienceDescription.trim();
     }
+
+    // Nominee — Family Protection ka claim isi naam par. Backend par
+    // optional: purane app version bina is field ke bhejte hain, unhe
+    // 400 dene se registration toot jaata. Form me app zaroori karti hai.
+    if (nomineeName !== undefined) {
+      const nominee = String(nomineeName).trim();
+      if (nominee.length > 100) {
+        return res.status(400).json({ success: false, message: 'Nominee name must be less than 100 characters' });
+      }
+      user.nomineeName = nominee || null;
+    }
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
     if (salaryType) user.salaryType = salaryType.toLowerCase();
 
@@ -1323,7 +1335,7 @@ exports.editWorkerProfile = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { primarySkillId, secondarySkillId, otherSkill, name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, workStateID, workCityID } = req.body;
+    const { primarySkillId, secondarySkillId, otherSkill, name, dateOfBirth, gender, totalExperience, experienceDescription, willingtoRelocate, salaryType, salary, location, workStateID, workCityID, nomineeName } = req.body;
 
     if (primarySkillId) {
       const parsedPrimaryId = parseInt(primarySkillId);
@@ -1435,6 +1447,17 @@ exports.editWorkerProfile = async (req, res) => {
         return res.status(400).json({ success: false, message: "Experience description must be less than 1000 characters" });
       }
       user.experienceDescription = experienceDescription.trim();
+    }
+
+    // Nominee — Family Protection ka claim isi naam par. Backend par
+    // optional: purane app version bina is field ke bhejte hain, unhe
+    // 400 dene se registration toot jaata. Form me app zaroori karti hai.
+    if (nomineeName !== undefined) {
+      const nominee = String(nomineeName).trim();
+      if (nominee.length > 100) {
+        return res.status(400).json({ success: false, message: 'Nominee name must be less than 100 characters' });
+      }
+      user.nomineeName = nominee || null;
     }
 
     if (willingtoRelocate !== undefined) user.willingtoRelocate = willingtoRelocate;
