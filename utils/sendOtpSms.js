@@ -26,10 +26,9 @@ function isProduction() {
 
 /// Sirf authkey zaroori hai.
 ///
-/// `MSG91_TEMPLATE_ID` optional hai: is account ke OTP Widget me
-/// Channels → SMS par "Use Default Configuration" chuna hua hai (dashboard
-/// me verify kiya gaya), yani koi custom template use nahi ho raha aur
-/// MSG91 default template se bhejta hai. Set karne par hi override hoga.
+/// `MSG91_TEMPLATE_ID` technically optional hai (bina iske bhi call
+/// chali jaati hai), par DLT ke baad iske bina SMS deliver nahi hote —
+/// isliye missing hone par sendOtpSms har baar warning log karta hai.
 function msg91Configured() {
   return !!process.env.MSG91_AUTH_KEY;
 }
@@ -70,10 +69,15 @@ async function sendOtpSms(phone, otp) {
     authkey: process.env.MSG91_AUTH_KEY,
   });
 
-  // Sirf tab bhejo jab explicitly set ho — warna MSG91 widget ki default
-  // SMS configuration use karta hai, jo is account par chuna hua hai.
+  // DLT ke baad template_id zaroori hai. Iske bina MSG91 apna default
+  // template aur `SMSIND` sender use karta hai, jo hamare DLT par
+  // registered nahi — operator aise SMS chup-chaap gira deta hai, aur
+  // MSG91 phir bhi "success" bolta hai. Isliye har baar zor se batao.
   if (process.env.MSG91_TEMPLATE_ID) {
     params.set('template_id', process.env.MSG91_TEMPLATE_ID);
+  } else {
+    console.warn('[sendOtpSms] MSG91_TEMPLATE_ID set nahi hai — SMS default '
+      + 'SMSIND template se jayega aur DLT ki wajah se operator use gira dega.');
   }
 
   try {
@@ -101,6 +105,13 @@ async function sendOtpSms(phone, otp) {
       console.error(`[sendOtpSms] MSG91 failed for ${mobile}: ${reason}`);
       return { sent: false, message: 'Could not send OTP. Please try again.' };
     }
+
+    // request_id se MSG91 ke delivery logs me yahi SMS dhoondha ja sakta
+    // hai — "OTP nahi aaya" par pm2 logs se seedha dashboard tak pahunch.
+    // OTP khud log nahi karte.
+    console.log(`[sendOtpSms] MSG91 accepted ${mobile.slice(0, 4)}******${mobile.slice(-2)}`
+      + ` request_id=${body.request_id || body.message || '?'}`
+      + ` template=${process.env.MSG91_TEMPLATE_ID ? 'set' : 'MISSING'}`);
 
     return { sent: true, message: 'OTP sent' };
   } catch (error) {
