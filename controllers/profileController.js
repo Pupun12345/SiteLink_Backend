@@ -1070,6 +1070,7 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
+        verificationRejectedReason: regularUser.verificationRejectedReason,
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1101,6 +1102,7 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
+        verificationRejectedReason: regularUser.verificationRejectedReason,
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1521,6 +1523,17 @@ exports.editWorkerProfile = async (req, res) => {
         success: false,
         message: "Government ID is required."
       });
+    }
+
+    // Admin ne documents reject kiye the aur worker ne naye upload kiye —
+    // wapas review queue (pending) me daalo, warna admin ko pata hi nahi
+    // chalega ki naye documents aaye hain.
+    const docsReuploaded =
+      !!req.files?.governmentID || !!req.files?.experienceCertificate?.length;
+    if (docsReuploaded && user.verificationStatus === 'rejected') {
+      user.verificationStatus = 'pending';
+      user.verificationRejectedReason = null;
+      user.verificationReviewedAt = null;
     }
 
     await user.save();
