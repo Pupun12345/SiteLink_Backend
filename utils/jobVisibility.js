@@ -69,6 +69,23 @@ function isJobLive(job, poster, now = new Date()) {
   return jobVisibleUntil(job, poster, now) > now;
 }
 
+/// Vendor ko dikhane ke liye poori tasveer: kab tak dikhegi, abhi live
+/// hai ya nahi, aur band hai to KYUN — app usi hisaab se label aur
+/// "Renew plan" button dikhata hai.
+///   hiddenReason: null | 'expired' (30 din poore) | 'plan_ended'
+///   (approval pending/rejected ya deactivated jobs par null — unka apna
+///   badge pehle se hai.)
+function jobVisibility(job, poster, now = new Date()) {
+  const visibleUntil = jobVisibleUntil(job, poster, now);
+  const isLive = isJobLive(job, poster, now);
+  let hiddenReason = null;
+  if (!isLive && job.approvalStatus === 'approved' && job.isActive !== false) {
+    const maxDate = new Date(new Date(job.createdAt).getTime() + JOB_VISIBLE_DAYS * DAY_MS);
+    hiddenReason = maxDate <= now ? 'expired' : 'plan_ended';
+  }
+  return { visibleUntil, isLive, hiddenReason };
+}
+
 /// postedBy user ki sirf wahi fields jo upar ke check ke liye chahiye.
 const POSTER_FIELDS = 'userType subscriptionStatus subscriptionExpiresAt';
 
@@ -78,4 +95,5 @@ module.exports = {
   liveJobFilter,
   jobVisibleUntil,
   isJobLive,
+  jobVisibility,
 };

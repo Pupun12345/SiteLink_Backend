@@ -7,7 +7,7 @@ const Amenity = require('../models/amenities');
 const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription, subscriptionRequired } = require('../utils/subscription');
-const { liveJobFilter, jobVisibleUntil, isJobLive, POSTER_FIELDS } = require('../utils/jobVisibility');
+const { liveJobFilter, jobVisibleUntil, isJobLive, jobVisibility, POSTER_FIELDS } = require('../utils/jobVisibility');
 
 // Total workers a vendor has already committed across their jobs. Deactivated
 // jobs still count (so delete+repost can't bypass the quota); only admin-
@@ -212,8 +212,7 @@ exports.getMyJobs = async (req, res) => {
     const data = jobs.map((job) => ({
       ..._formatJobSummary(job),
       rejectionReason: job.rejectionReason || null,
-      visibleUntil: jobVisibleUntil(job, req.user, now),
-      isLive: isJobLive(job, req.user, now),
+      ...jobVisibility(job, req.user, now),
     }));
 
     // Worker quota summary — vendor ko dikhane ke liye (kitne use kiye / bache).
@@ -711,6 +710,8 @@ exports.createJob = async (req, res) => {
         ? 'Job created and published successfully'
         : 'Job submitted successfully. It will be visible once approved by an admin.',
       data: job,
+      // Vendor ko turant pata chale ki job kab tak workers ko dikhegi.
+      visibility: jobVisibility(job, user),
     });
   } catch (error) {
     res.status(500).json({
