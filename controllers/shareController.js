@@ -3,6 +3,7 @@ const Post = require('../models/Post');
 // Filename lowercase hai (models/job.js) — Linux case-sensitive hai, isliye
 // '../models/Job' wahan MODULE_NOT_FOUND deta tha (Windows par chal jaata hai).
 const Job = require('../models/job');
+const { isJobLive, POSTER_FIELDS } = require('../utils/jobVisibility');
 
 // ═══════════════════════════════════════════════════════════════════
 //  SHARE / DEEP LINK LANDING
@@ -237,9 +238,11 @@ exports.shareJobPage = makeSharePage({
       isActive: true,
       approvalStatus: 'approved',
     })
-      .select('title company location salary salaryType description isUrgent')
+      .select('title company location salary salaryType description isUrgent isActive approvalStatus createdAt postedBy')
+      .populate('postedBy', POSTER_FIELDS)
       .lean();
-    if (!job) return null;
+    // 30 din / vendor ka plan khatam — expire job ka preview nahi.
+    if (!job || !isJobLive(job, job.postedBy)) return null;
 
     // "₹800/day · Andheri, Mumbai" — preview me sabse kaam ki do baatein
     const bits = [];

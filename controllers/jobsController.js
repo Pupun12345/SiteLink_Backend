@@ -7,6 +7,7 @@ const Amenity = require('../models/amenities');
 const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription, subscriptionRequired } = require('../utils/subscription');
+const { liveJobFilter, jobVisibleUntil, isJobLive, POSTER_FIELDS } = require('../utils/jobVisibility');
 
 // Total workers a vendor has already committed across their jobs. Deactivated
 // jobs still count (so delete+repost can't bypass the quota); only admin-
@@ -100,9 +101,9 @@ exports.getJobs = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    // Deactivated jobs (vendor ne delete/deactivate kiye) discovery me nahi
-    // dikhne chahiye — sirf approved + active.
-    let filter = { "approvalStatus": "approved", "isActive": { $ne: false } };
+    // Sirf live jobs: approved + active, post hue 30 din se kam, aur vendor
+    // ka plan chal raha ho (utils/jobVisibility.js).
+    let filter = await liveJobFilter();
 
     if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
 
@@ -205,9 +206,14 @@ exports.getMyJobs = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Vendor ko bhi pata chale ki uski job workers ko kab tak dikhegi
+    // (30 din ya plan khatam hone tak, jo pehle).
+    const now = new Date();
     const data = jobs.map((job) => ({
       ..._formatJobSummary(job),
       rejectionReason: job.rejectionReason || null,
+      visibleUntil: jobVisibleUntil(job, req.user, now),
+      isLive: isJobLive(job, req.user, now),
     }));
 
     // Worker quota summary — vendor ko dikhane ke liye (kitne use kiye / bache).
@@ -317,6 +323,16 @@ exports.applyToJob = async (req, res) => {
       });
     }
 
+    // 30 din poore ho gaye ya vendor ka plan khatam — job ab live nahi.
+    const poster = await User.findById(job.postedBy).select(POSTER_FIELDS).lean();
+    if (!isJobLive(job, poster)) {
+      return res.status(400).json({
+        success: false,
+        code: 'JOB_EXPIRED',
+        message: 'This job is no longer accepting applications',
+      });
+    }
+
     const existingApplication = await Application.findOne({
       job: jobId,
       applicant: applicantId,
@@ -374,7 +390,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience applicationsCount status approvalStatus postedBy amenities").populate("postedBy", "name designation companyName phone whatsappNumber").populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience applicationsCount status approvalStatus isActive createdAt postedBy amenities").populate("postedBy", `name designation companyName phone whatsappNumber ${POSTER_FIELDS}`).populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -403,7 +419,24 @@ exports.getJobDetailsById = async (req, res) => {
       contactUnlocked = isOwner;
     }
 
+    // Expire ho chuki job (30 din / vendor ka plan khatam) sirf owner aur
+    // pehle se apply kar chuke worker ko dikhti hai — baaki ke liye band.
+    const now = new Date();
+    job.visibleUntil = jobVisibleUntil(job, job.postedBy, now);
+    job.isLive = isJobLive(job, job.postedBy, now);
+    if (!job.isLive && !isOwner && !applicationStatus) {
+      return res.status(404).json({
+        success: false,
+        code: 'JOB_EXPIRED',
+        message: 'This job is no longer available',
+      });
+    }
+
     if (job.postedBy) {
+      // Plan ki details sirf visibility check ke liye li thi — bahar nahi.
+      delete job.postedBy.userType;
+      delete job.postedBy.subscriptionStatus;
+      delete job.postedBy.subscriptionExpiresAt;
       // Vendor ka asli/login number (`phone`) kabhi bahar nahi jaata — sirf
       // job ka owner apna dekh sakta hai. Worker ko hamesha wahi WhatsApp
       // number milta hai jo vendor ne profile me diya hai; na diya ho to
