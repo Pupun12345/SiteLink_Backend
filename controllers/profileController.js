@@ -4,6 +4,7 @@ const Skill = require('../models/Skill');
 const { generateOTP, getOTPExpiry, DEV_OTP } = require('../utils/otpUtils');
 const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
+const notifyAdmin = require('../utils/notifyAdmin');
 const { hasActiveSubscription } = require('../utils/subscription');
 
 const STATES = [
@@ -1530,13 +1531,33 @@ exports.editWorkerProfile = async (req, res) => {
     // chalega ki naye documents aaye hain.
     const docsReuploaded =
       !!req.files?.governmentID || !!req.files?.experienceCertificate?.length;
-    if (docsReuploaded && user.verificationStatus === 'rejected') {
+    const wasRejected = user.verificationStatus === 'rejected';
+    if (docsReuploaded && wasRejected) {
       user.verificationStatus = 'pending';
       user.verificationRejectedReason = null;
       user.verificationReviewedAt = null;
     }
 
     await user.save();
+
+    // Admin panel me alert — naye documents review karne hain.
+    if (docsReuploaded) {
+      const uploaded = [
+        req.files?.governmentID && 'Government ID',
+        req.files?.experienceCertificate?.length &&
+          `${req.files.experienceCertificate.length} experience certificate(s)`,
+      ].filter(Boolean).join(' + ');
+      notifyAdmin({
+        title: wasRejected ? 'Documents re-uploaded after rejection' : 'Worker added new documents',
+        message: `${user.name || 'A worker'} (${user.phone || 'no phone'}) uploaded ${uploaded}. Please review.`,
+        category: wasRejected ? 'warning' : 'info',
+        priority: wasRejected ? 'high' : 'medium',
+        userId: user._id,
+        actionUrl: `/admin/workers/${user._id}`,
+        actionText: 'Review Documents',
+        metadata: { workerName: user.name, phone: user.phone, uploaded },
+      });
+    }
     const savedUser = await User.findById(user._id);
 
     res.json({
