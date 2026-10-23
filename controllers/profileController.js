@@ -1072,6 +1072,12 @@ exports.getProfile = async (req, res) => {
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
         verificationRejectedReason: regularUser.verificationRejectedReason,
+        // Har document ka admin review (path → approved / rejected + reason).
+        // Jis document ka review nahi wo "under review" hai. App isi se
+        // sirf rejected documents par Re-upload dikhata hai.
+        documentReviews: (regularUser.documentReviews || []).map((r) => ({
+          path: r.path, docType: r.docType, status: r.status, reason: r.reason || null,
+        })),
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1526,32 +1532,53 @@ exports.editWorkerProfile = async (req, res) => {
       });
     }
 
-    // Admin ne documents reject kiye the aur worker ne naye upload kiye —
-    // wapas review queue (pending) me daalo, warna admin ko pata hi nahi
-    // chalega ki naye documents aaye hain.
-    const docsReuploaded =
-      !!req.files?.governmentID || !!req.files?.experienceCertificate?.length;
+    // ── Documents badle (naya upload / certificate hataya) ─────────────
+    // Har document ka review uske PATH se juda hai (documentReviews). Jo
+    // document badal gaya ya hat gaya, uska purana review bhi hatao — naya
+    // file "under review" ho jaata hai.
+    //
+    // Admin ne specific documents reject kiye the to status tabhi wapas
+    // 'pending' hota hai jab SAARE rejected documents badal diye jaayein —
+    // aadhe kaam par admin ko review ke liye nahi bhejte. Purana reject (bina
+    // document-wise review ke) → koi bhi naya upload kaafi.
+    const docsChanged = user.isModified('governmentID') || user.isModified('experienceCertificate');
     const wasRejected = user.verificationStatus === 'rejected';
-    if (docsReuploaded && wasRejected) {
-      user.verificationStatus = 'pending';
-      user.verificationRejectedReason = null;
-      user.verificationReviewedAt = null;
+    let resubmitted = false;
+    if (docsChanged) {
+      const currentPaths = new Set([
+        user.governmentID,
+        ...(user.experienceCertificate || []),
+      ].filter(Boolean));
+      const prevReviews = user.documentReviews || [];
+      const hadDocRejections = prevReviews.some((r) => r.status === 'rejected');
+      user.documentReviews = prevReviews.filter((r) => currentPaths.has(r.path));
+      const stillRejected = user.documentReviews.filter((r) => r.status === 'rejected');
+
+      if (wasRejected && (!hadDocRejections || stillRejected.length === 0)) {
+        user.verificationStatus = 'pending';
+        user.verificationRejectedReason = null;
+        user.verificationReviewedAt = null;
+        resubmitted = true;
+      }
     }
 
     await user.save();
 
-    // Admin panel me alert — naye documents review karne hain.
-    if (docsReuploaded) {
+    // Admin panel me alert — naye documents review karne hain. Rejected
+    // worker ke liye tabhi jab saare rejected documents theek ho gaye.
+    const filesUploaded =
+      !!req.files?.governmentID || !!req.files?.experienceCertificate?.length;
+    if (resubmitted || (!wasRejected && filesUploaded)) {
       const uploaded = [
         req.files?.governmentID && 'Government ID',
         req.files?.experienceCertificate?.length &&
           `${req.files.experienceCertificate.length} experience certificate(s)`,
-      ].filter(Boolean).join(' + ');
+      ].filter(Boolean).join(' + ') || 'updated documents';
       notifyAdmin({
-        title: wasRejected ? 'Documents re-uploaded after rejection' : 'Worker added new documents',
+        title: resubmitted ? 'Documents re-uploaded after rejection' : 'Worker added new documents',
         message: `${user.name || 'A worker'} (${user.phone || 'no phone'}) uploaded ${uploaded}. Please review.`,
-        category: wasRejected ? 'warning' : 'info',
-        priority: wasRejected ? 'high' : 'medium',
+        category: resubmitted ? 'warning' : 'info',
+        priority: resubmitted ? 'high' : 'medium',
         userId: user._id,
         actionUrl: `/admin/workers/${user._id}`,
         actionText: 'Review Documents',

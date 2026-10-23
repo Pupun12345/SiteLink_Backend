@@ -255,6 +255,22 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // ── Har document ka alag admin review ───────────────────────────────
+  // Admin panel likhta hai (reject/verify par). File ke PATH se jude
+  // hain — worker naya document upload kare to naya path aata hai, jiska
+  // koi review nahi = "under review". Sirf rejected documents dobara
+  // maange jaate hain. Admin backend ke User model me bhi same field hai.
+  documentReviews: {
+    type: [{
+      _id: false,
+      path: { type: String, required: true },
+      docType: { type: String, enum: ['governmentID', 'experienceCertificate'] },
+      status: { type: String, enum: ['approved', 'rejected'], required: true },
+      reason: { type: String, default: null },
+      reviewedAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
   // ── Worker performance rating (AUTOMATIC — koi manually nahi deta) ──
   // Application outcomes se calculate hoti hai (utils/workerRating.js) aur
   // yahan denormalized rakhi jaati hai, taaki applicant list / job feed
