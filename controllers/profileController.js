@@ -8,24 +8,25 @@ const notifyAdmin = require('../utils/notifyAdmin');
 
 /// Worker ke documents ka review, app ko bhejne ke liye.
 ///
-/// Document-wise review aane se PEHLE verify hue workers ke paas koi review
-/// record nahi hai — unke documents "Under review" dikhte the jabki account
-/// verified hai. Aise purane verified workers ke abhi ke saare documents
-/// approved maante hain. (Verify ke baad juda naya document review record
-/// ke bina hi rehta hai — wo sahi me "under review" hai — isliye ye sirf tab
-/// jab ek bhi review record na ho.)
+/// Admin sirf GOVERNMENT ID approve / reject karta hai. Experience
+/// certificate ka koi review nahi — wo sirf vendor ko dikhane ke liye hain
+/// (hire hone ke chance badhte hain), isliye unka review kabhi nahi bhejte.
+///
+/// Document-wise review aane se PEHLE verify hue workers ke paas ID ka
+/// review record nahi hai — unki ID approved maanate hain. (Verify ke baad
+/// nayi ID upload ki ho to uska record nahi hoga par purani ID ka hoga —
+/// wo sahi me "under review" hai.)
 function workerDocumentReviews(user) {
-  const reviews = user.documentReviews || [];
-  if (reviews.length === 0 && user.verificationStatus === 'verified') {
-    return [
-      ...(user.governmentID ? [{ path: user.governmentID, docType: 'governmentID' }] : []),
-      ...(user.experienceCertificate || []).filter(Boolean)
-        .map((path) => ({ path, docType: 'experienceCertificate' })),
-    ].map((d) => ({ ...d, status: 'approved', reason: null }));
+  if (!user.governmentID) return [];
+  const idReviews = (user.documentReviews || []).filter((r) => r.docType === 'governmentID');
+  const current = idReviews.find((r) => r.path === user.governmentID);
+  if (current) {
+    return [{ path: current.path, docType: 'governmentID', status: current.status, reason: current.reason || null }];
   }
-  return reviews.map((r) => ({
-    path: r.path, docType: r.docType, status: r.status, reason: r.reason || null,
-  }));
+  if (idReviews.length === 0 && user.verificationStatus === 'verified') {
+    return [{ path: user.governmentID, docType: 'governmentID', status: 'approved', reason: null }];
+  }
+  return [];
 }
 const { hasActiveSubscription } = require('../utils/subscription');
 
@@ -1552,29 +1553,20 @@ exports.editWorkerProfile = async (req, res) => {
       });
     }
 
-    // ── Documents badle (naya upload / certificate hataya) ─────────────
-    // Har document ka review uske PATH se juda hai (documentReviews). Jo
-    // document badal gaya ya hat gaya, uska purana review bhi hatao — naya
-    // file "under review" ho jaata hai.
+    // ── Government ID badli ──────────────────────────────────────────
+    // Admin sirf Government ID review karta hai. Experience certificates
+    // worker kabhi bhi jode / badle / hataye — unse verification status par
+    // koi asar nahi aur admin ko alert bhi nahi (wo sirf vendor ke liye hain).
     //
-    // Admin ne specific documents reject kiye the to status tabhi wapas
-    // 'pending' hota hai jab SAARE rejected documents badal diye jaayein —
-    // aadhe kaam par admin ko review ke liye nahi bhejte. Purana reject (bina
-    // document-wise review ke) → koi bhi naya upload kaafi.
-    const docsChanged = user.isModified('governmentID') || user.isModified('experienceCertificate');
+    // Nayi ID upload hui → uska purana review hatao (nayi ID "under review").
+    // Admin ne reject kiya tha → nayi ID aate hi wapas 'pending' + admin alert.
+    const idChanged = user.isModified('governmentID') && !!req.files?.governmentID;
     const wasRejected = user.verificationStatus === 'rejected';
     let resubmitted = false;
-    if (docsChanged) {
-      const currentPaths = new Set([
-        user.governmentID,
-        ...(user.experienceCertificate || []),
-      ].filter(Boolean));
-      const prevReviews = user.documentReviews || [];
-      const hadDocRejections = prevReviews.some((r) => r.status === 'rejected');
-      user.documentReviews = prevReviews.filter((r) => currentPaths.has(r.path));
-      const stillRejected = user.documentReviews.filter((r) => r.status === 'rejected');
-
-      if (wasRejected && (!hadDocRejections || stillRejected.length === 0)) {
+    if (idChanged) {
+      user.documentReviews = (user.documentReviews || []).filter(
+        (r) => r.docType === 'governmentID' && r.path === user.governmentID);
+      if (wasRejected) {
         user.verificationStatus = 'pending';
         user.verificationRejectedReason = null;
         user.verificationReviewedAt = null;
@@ -1584,25 +1576,17 @@ exports.editWorkerProfile = async (req, res) => {
 
     await user.save();
 
-    // Admin panel me alert — naye documents review karne hain. Rejected
-    // worker ke liye tabhi jab saare rejected documents theek ho gaye.
-    const filesUploaded =
-      !!req.files?.governmentID || !!req.files?.experienceCertificate?.length;
-    if (resubmitted || (!wasRejected && filesUploaded)) {
-      const uploaded = [
-        req.files?.governmentID && 'Government ID',
-        req.files?.experienceCertificate?.length &&
-          `${req.files.experienceCertificate.length} experience certificate(s)`,
-      ].filter(Boolean).join(' + ') || 'updated documents';
+    // Admin panel me alert — sirf nayi Government ID par (review karni hai).
+    if (idChanged) {
       notifyAdmin({
-        title: resubmitted ? 'Documents re-uploaded after rejection' : 'Worker added new documents',
-        message: `${user.name || 'A worker'} (${user.phone || 'no phone'}) uploaded ${uploaded}. Please review.`,
+        title: resubmitted ? 'Government ID re-uploaded after rejection' : 'Worker uploaded a new Government ID',
+        message: `${user.name || 'A worker'} (${user.phone || 'no phone'}) uploaded a new Government ID. Please review.`,
         category: resubmitted ? 'warning' : 'info',
         priority: resubmitted ? 'high' : 'medium',
         userId: user._id,
         actionUrl: `/admin/workers/${user._id}`,
-        actionText: 'Review Documents',
-        metadata: { workerName: user.name, phone: user.phone, uploaded },
+        actionText: 'Review Government ID',
+        metadata: { workerName: user.name, phone: user.phone, uploaded: 'Government ID' },
       });
     }
     const savedUser = await User.findById(user._id);

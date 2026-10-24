@@ -264,6 +264,7 @@ const userSchema = new mongoose.Schema({
     type: [{
       _id: false,
       path: { type: String, required: true },
+      // Abhi sirf 'governmentID' review hota hai (certificates ka nahi).
       docType: { type: String, enum: ['governmentID', 'experienceCertificate'] },
       status: { type: String, enum: ['approved', 'rejected'], required: true },
       reason: { type: String, default: null },
