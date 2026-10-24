@@ -14,7 +14,7 @@ const { hasActiveSubscription } = require('./subscription');
 //
 // Expiry ki koi alag date job par save NAHI karte — vendor renew kare to
 // job apne aap wapas dikhne lagti hai (30 din ke andar), aur cron ki
-// zaroorat nahi. Admin ki post ki hui jobs par plan ka rule nahi lagta,
+// zaroorat nahi. Admin / sub-admin ki jobs par plan ka rule nahi lagta,
 // sirf 30 din wala.
 
 const JOB_VISIBLE_DAYS = 30;
@@ -25,17 +25,18 @@ function oldestLivePostDate(now = new Date()) {
   return new Date(now.getTime() - JOB_VISIBLE_DAYS * DAY_MS);
 }
 
-/// Wo users jinki jobs abhi dikh sakti hain: admin, aur active plan wale
-/// vendors. Job list ke Mongo filter me `postedBy: { $in: ... }` ke liye.
-async function liveJobPosterIds(now = new Date()) {
+/// Wo VENDORS jinka plan abhi nahi chal raha — inki jobs nahi dikhti.
+///
+/// Ulta (allow-list) nahi banate: jobs admin bhi post karte hain, aur
+/// admin do jagah se aate hain — super admin `users` me (role 'admin',
+/// userType kuch bhi) aur sub-admin alag `adminusers` collection me. Plan
+/// ka rule sirf vendor par hai, isliye sirf unhe chhaant-te hain.
+async function vendorsWithoutPlanIds(now = new Date()) {
   return User.find({
+    userType: 'vendor',
     $or: [
-      { userType: 'admin' },
-      {
-        userType: 'vendor',
-        subscriptionStatus: 'active',
-        subscriptionExpiresAt: { $gt: now },
-      },
+      { subscriptionStatus: { $ne: 'active' } },
+      { subscriptionExpiresAt: { $not: { $gt: now } } },
     ],
   }).distinct('_id');
 }
@@ -46,7 +47,7 @@ async function liveJobFilter(now = new Date()) {
     approvalStatus: 'approved',
     isActive: { $ne: false },
     createdAt: { $gte: oldestLivePostDate(now) },
-    postedBy: { $in: await liveJobPosterIds(now) },
+    postedBy: { $nin: await vendorsWithoutPlanIds(now) },
   };
 }
 
@@ -54,7 +55,9 @@ async function liveJobFilter(now = new Date()) {
 /// (userType, subscriptionStatus, subscriptionExpiresAt chahiye).
 function jobVisibleUntil(job, poster, now = new Date()) {
   const maxDate = new Date(new Date(job.createdAt).getTime() + JOB_VISIBLE_DAYS * DAY_MS);
-  if (poster?.userType === 'admin') return maxDate;
+  // Plan ka rule sirf vendor par. Admin / sub-admin (jo `users` me mile hi
+  // nahi, poster null) — sirf 30 din.
+  if (poster?.userType !== 'vendor') return maxDate;
   // Plan active nahi (status inactive/expired) to expiry date jo bhi ho,
   // job abhi se band — list ke filter se match rakhne ke liye.
   const planEnd = hasActiveSubscription(poster)
