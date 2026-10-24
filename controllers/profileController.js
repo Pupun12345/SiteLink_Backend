@@ -5,6 +5,28 @@ const { generateOTP, getOTPExpiry, DEV_OTP } = require('../utils/otpUtils');
 const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
 const notifyAdmin = require('../utils/notifyAdmin');
+
+/// Worker ke documents ka review, app ko bhejne ke liye.
+///
+/// Document-wise review aane se PEHLE verify hue workers ke paas koi review
+/// record nahi hai — unke documents "Under review" dikhte the jabki account
+/// verified hai. Aise purane verified workers ke abhi ke saare documents
+/// approved maante hain. (Verify ke baad juda naya document review record
+/// ke bina hi rehta hai — wo sahi me "under review" hai — isliye ye sirf tab
+/// jab ek bhi review record na ho.)
+function workerDocumentReviews(user) {
+  const reviews = user.documentReviews || [];
+  if (reviews.length === 0 && user.verificationStatus === 'verified') {
+    return [
+      ...(user.governmentID ? [{ path: user.governmentID, docType: 'governmentID' }] : []),
+      ...(user.experienceCertificate || []).filter(Boolean)
+        .map((path) => ({ path, docType: 'experienceCertificate' })),
+    ].map((d) => ({ ...d, status: 'approved', reason: null }));
+  }
+  return reviews.map((r) => ({
+    path: r.path, docType: r.docType, status: r.status, reason: r.reason || null,
+  }));
+}
 const { hasActiveSubscription } = require('../utils/subscription');
 
 const STATES = [
@@ -1075,9 +1097,7 @@ exports.getProfile = async (req, res) => {
         // Har document ka admin review (path → approved / rejected + reason).
         // Jis document ka review nahi wo "under review" hai. App isi se
         // sirf rejected documents par Re-upload dikhata hai.
-        documentReviews: (regularUser.documentReviews || []).map((r) => ({
-          path: r.path, docType: r.docType, status: r.status, reason: r.reason || null,
-        })),
+        documentReviews: workerDocumentReviews(regularUser),
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
