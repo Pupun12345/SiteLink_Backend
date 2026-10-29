@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const Amenity = require('../models/amenities');
 const PlanDetails = require('../models/PlanDetails');
 const notifyUser = require('../utils/notifyUser');
+const notifyMatchingWorkers = require('../utils/notifyMatchingWorkers');
 const { hasActiveSubscription, subscriptionRequired } = require('../utils/subscription');
 const { liveJobFilter, jobVisibleUntil, isJobLive, jobVisibility, POSTER_FIELDS } = require('../utils/jobVisibility');
 
@@ -713,6 +714,10 @@ exports.createJob = async (req, res) => {
       // Vendor ko turant pata chale ki job kab tak workers ko dikhegi.
       visibility: jobVisibility(job, user),
     });
+
+    // Live job hai to sahi workers ko batao (skill + jagah match). Response
+    // iska intezaar nahi karta.
+    if (job.approvalStatus === 'approved') notifyMatchingWorkers(job);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -1029,6 +1034,9 @@ exports.approveJob = async (req, res) => {
       body: `Your job "${job.title}" has been approved and is now live.`,
       data: { jobId: job._id },
     }).catch((e) => console.error('[approveJob] notifyUser failed:', e.message));
+
+    // Ab live hui — matching workers ko nayi job ki khabar.
+    notifyMatchingWorkers(job);
 
     res.status(200).json({
       success: true,

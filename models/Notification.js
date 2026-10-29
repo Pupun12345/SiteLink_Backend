@@ -38,6 +38,8 @@ const notificationSchema = new mongoose.Schema({
       'autopay_cancelled',
       'autopay_failed',
       'phone_changed',
+      // Nayi job matching workers ko (utils/notifyMatchingWorkers.js)
+      'new_job',
       'general',
     ],
     default: 'general',
