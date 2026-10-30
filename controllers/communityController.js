@@ -760,7 +760,17 @@ exports.deleteComment = async (req, res) => {
 
     comment.status = 'deleted';
     await comment.save();
-    await Post.updateOne({ _id: postId }, { $inc: { commentsCount: -1 } });
+    // Top-level comment hata to uske replies bhi — warna wo bache rehte
+    // aur post ki ginti (jisme replies bhi gine jaate hain) galat ho jaati.
+    let removed = 1;
+    if (!comment.parentComment) {
+      const r = await Comment.updateMany(
+        { parentComment: comment._id, status: 'active' },
+        { $set: { status: 'deleted' } },
+      );
+      removed += r.modifiedCount || 0;
+    }
+    await Post.updateOne({ _id: postId }, { $inc: { commentsCount: -removed } });
 
     res.status(200).json({
       success: true,
@@ -821,7 +831,7 @@ exports.getCommentsByPost = async (req, res) => {
           path: 'userId',
           select: 'name profileImage userType verificationStatus'
         },
-        options: { sort: { createdAt: 1 }, limit: 3 }
+        options: { sort: { createdAt: 1 }, limit: 100 }
       })
       .sort(sortCriteria)
       .skip(skip)
@@ -833,28 +843,36 @@ exports.getCommentsByPost = async (req, res) => {
       status: 'active'
     });
 
+    // Comment / reply likhne wala `users` me na mile (admin panel ke
+    // sub-admin `adminusers` me hote hain) to `userId` null aata hai —
+    // pehle `.name` par crash hokar poori list fail ho jaati thi.
+    const author = (c) => {
+      const u = c.userId && typeof c.userId === 'object' && c.userId._id ? c.userId : null;
+      return {
+        userId: u ? u._id : c.userId,
+        userName: u ? u.name : 'Sitelink Team',
+        userImage: u ? (u.profileImage || null) : null,
+        userType: u ? u.userType : 'admin',
+        isVerified: u ? u.verificationStatus === 'verified' : true,
+      };
+    };
+
     const transformedComments = comments.map(comment => ({
       _id: comment._id,
       comment: comment.comment,
-      userId: comment.userId._id,
-      userName: comment.userId.name,
-      userImage: comment.userId.profileImage || null,
-      userType: comment.userId.userType,
-      isVerified: comment.userId.verificationStatus === 'verified',
+      ...author(comment),
       likesCount: comment.likesCount,
 
       isEdited: comment.isEdited,
       editedAt: comment.editedAt,
       createdAt: comment.createdAt,
       updatedAt: comment.updatedAt,
+      // Saare replies (purane se naye) — app comment ke neeche dikhati hai.
+      repliesCount: comment.replies ? comment.replies.length : 0,
       replies: comment.replies ? comment.replies.map(reply => ({
         _id: reply._id,
         comment: reply.comment,
-        userId: reply.userId._id,
-        userName: reply.userId.name,
-        userImage: reply.userId.profileImage || null,
-        userType: reply.userId.userType,
-        isVerified: reply.userId.verificationStatus === 'verified',
+        ...author(reply),
         likesCount: reply.likesCount,
         isEdited: reply.isEdited,
         editedAt: reply.editedAt,
