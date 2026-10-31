@@ -136,11 +136,49 @@ exports.verifyPayment = async (req, res) => {
       crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpay_signature));
 
     if (!signaturesMatch) {
+      // Pehle se "paid" payment ko galat request "failed" na bana de.
       await Payment.findOneAndUpdate(
-        { orderId: razorpay_order_id },
+        { orderId: razorpay_order_id, status: { $ne: 'paid' } },
         { status: 'failed', paymentId: razorpay_payment_id }
       );
       return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    }
+
+    // Order humara hi bana hua, isi user ka aur isi plan ka ho — warna koi
+    // sasta plan ka order bana ke verify me mehenga planId bhej sakta tha.
+    const payment = await Payment.findOne({ orderId: razorpay_order_id });
+    if (!payment
+      || String(payment.user) !== String(req.user.id)
+      || String(payment.plan) !== String(plan._id)) {
+      return res.status(400).json({ success: false, message: 'Order does not match this plan' });
+    }
+    // Ye payment pehle hi verify ho chuka (app ka retry) — plan dobara mat
+    // badhao, wahi jawab do.
+    if (payment.status === 'paid') {
+      const already = await User.findById(req.user.id).select('subscriptionExpiresAt');
+      return res.status(200).json({
+        success: true,
+        message: 'Subscription activated!',
+        data: {
+          expiryDate: already?.subscriptionExpiresAt,
+          plan: plan.planName,
+          subscriptionStatus: 'active',
+        },
+      });
+    }
+
+    // Ek hi pal me do verify aayein to bhi plan ek hi baar badhe — jo
+    // pehle "paid" claim kare wahi aage badhega (atomic).
+    const claimed = await Payment.findOneAndUpdate(
+      { _id: payment._id, status: { $ne: 'paid' } },
+      { status: 'paid', paymentId: razorpay_payment_id, signature: razorpay_signature },
+    );
+    if (!claimed) {
+      return res.status(200).json({
+        success: true,
+        message: 'Subscription activated!',
+        data: { plan: plan.planName, subscriptionStatus: 'active' },
+      });
     }
 
     // Signature valid — activate / extend the subscription.
@@ -179,11 +217,6 @@ exports.verifyPayment = async (req, res) => {
     user.lastPaymentId = razorpay_payment_id;
     user.subscription = true;
     await user.save();
-
-    await Payment.findOneAndUpdate(
-      { orderId: razorpay_order_id },
-      { status: 'paid', paymentId: razorpay_payment_id, signature: razorpay_signature }
-    );
 
     notifyUser(user._id, {
       type: 'subscription_activated',
@@ -248,8 +281,31 @@ function razorpayPeriod(frequency) {
 /// amount/frequency badalne par purana plan id galat ho jaata hai —
 /// isliye editPlanAmount wahan razorpayPlanId null kar deta hai, aur
 /// agli subscribe par naya plan ban jaata hai.
+// Is server process me ek baar check ho chuke plan ids (har subscribe par
+// Razorpay ko dobara na poochhein).
+const verifiedPlanIds = new Set();
+
 async function ensureRazorpayPlan(plan) {
-  if (plan.razorpayPlanId) return plan.razorpayPlanId;
+  if (plan.razorpayPlanId) {
+    if (verifiedPlanIds.has(plan.razorpayPlanId)) return plan.razorpayPlanId;
+    // Saved id abhi ke Razorpay account (test / live) me hai? Test key se
+    // bani id live key ke saath "does not exist" deti hai — tab nayi bana
+    // lete hain, kisi ko DB me haath lagane ki zaroorat nahi.
+    const check = await fetch(`${RAZORPAY_BASE}/plans/${plan.razorpayPlanId}`, {
+      headers: { Authorization: razorpayAuthHeader() },
+    });
+    if (check.ok) {
+      verifiedPlanIds.add(plan.razorpayPlanId);
+      return plan.razorpayPlanId;
+    }
+    if (check.status !== 400 && check.status !== 404) {
+      // Network / Razorpay down — purani id mat bigaado, error do.
+      throw new Error(`Could not verify Razorpay plan (HTTP ${check.status})`);
+    }
+    console.warn(`[payments] plan ${plan.planName}: saved Razorpay plan id not found `
+      + `on this account (test → live?) — creating a new one`);
+    plan.razorpayPlanId = null;
+  }
 
   const { period, interval } = razorpayPeriod(plan.frequency);
   const res = await fetch(`${RAZORPAY_BASE}/plans`, {
@@ -265,7 +321,7 @@ async function ensureRazorpayPlan(plan) {
         name: plan.planName,
         amount: Math.round(Number(plan.amount) * 100),
         currency: 'INR',
-        description: `SiteLink ${plan.planName}`,
+        description: `Sitelink ${plan.planName}`,
       },
       notes: { planId: plan._id.toString() },
     }),
@@ -401,9 +457,32 @@ exports.verifySubscription = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Plan not found' });
     }
 
+    // Subscription humne isi user + isi plan ke liye banayi thi (notes me
+    // likha hai) — warna sasta plan subscribe karke mehenga planId bhej ke
+    // mehenga plan mil jaata.
+    const subRes = await fetch(`${RAZORPAY_BASE}/subscriptions/${razorpay_subscription_id}`, {
+      headers: { Authorization: razorpayAuthHeader() },
+    });
+    const subBody = await subRes.json().catch(() => ({}));
+    if (!subRes.ok
+      || String(subBody?.notes?.userId) !== String(req.user.id)
+      || String(subBody?.notes?.planId) !== String(plan._id)) {
+      return res.status(400).json({ success: false, message: 'Subscription does not match this plan' });
+    }
+
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Wahi subscription dobara verify (app ka retry) — plan dobara mat badhao.
+    if (user.razorpaySubscriptionId === razorpay_subscription_id
+      && await Subscription.exists({ razorpaySubscriptionId: razorpay_subscription_id })) {
+      return res.status(200).json({
+        success: true,
+        message: 'Auto-payment activated!',
+        data: { expiryDate: user.subscriptionExpiresAt, plan: plan.planName, subscriptionStatus: 'active' },
+      });
     }
 
     const expiry = addCycle(new Date(), plan.frequency);
