@@ -9,6 +9,12 @@ const Application = require('../models/Application');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription } = require('../utils/subscription');
 
+// Admin ki post par naam "Admin" nahi — brand "Sitelink" dikhe. Purani
+// posts me snapshot "Admin" pada hai, isliye yahin (response me) badalte hain.
+const BRAND_NAME = 'Sitelink';
+const displayPosterName = (post) =>
+  post.posterType === 'admin' ? BRAND_NAME : post.posterName;
+
 // Feed/post me dikhne wala avatar.
 //
 // Vendor ki pehchaan uski company hai, isliye uska avatar company logo
@@ -63,7 +69,7 @@ function formatPost(post, { viewerId } = {}) {
     images: post.images,
     video: post.video,
     feeling: post.feeling,
-    posterName: post.posterName,
+    posterName: displayPosterName(post),
     posterImage: posterAvatar(post, author),
     posterType: post.posterType,
     posterDesignation:
@@ -125,7 +131,7 @@ exports.getCommunityFeed = async (req, res) => {
       images: post.images,
       video: post.video,
       feeling: post.feeling,
-      posterName: post.posterName,
+      posterName: displayPosterName(post),
       posterImage: posterAvatar(post, post.postedBy),
       posterType: post.posterType,
       posterDesignation:
@@ -194,7 +200,7 @@ exports.getMyPosts = async (req, res) => {
       images: post.images,
       video: post.video,
       feeling: post.feeling,
-      posterName: post.posterName,
+      posterName: displayPosterName(post),
       posterImage: posterAvatar(post, req.user),
       posterType: post.posterType,
       // Apni hi posts hain — purani posts ke liye req.user se fallback.
@@ -375,7 +381,7 @@ exports.createPost = async (req, res) => {
         images: populatedPost.images,
         video: populatedPost.video,
         feeling: populatedPost.feeling,
-        posterName: populatedPost.posterName,
+        posterName: displayPosterName(populatedPost),
         posterImage: populatedPost.posterImage,
         posterType: populatedPost.posterType,
         posterDesignation: populatedPost.posterDesignation,
@@ -850,7 +856,8 @@ exports.getCommentsByPost = async (req, res) => {
       const u = c.userId && typeof c.userId === 'object' && c.userId._id ? c.userId : null;
       return {
         userId: u ? u._id : c.userId,
-        userName: u ? u.name : 'Sitelink Team',
+        // Admin ka comment / reply — naam ki jagah brand
+        userName: !u || u.userType === 'admin' ? 'Sitelink' : u.name,
         userImage: u ? (u.profileImage || null) : null,
         userType: u ? u.userType : 'admin',
         isVerified: u ? u.verificationStatus === 'verified' : true,

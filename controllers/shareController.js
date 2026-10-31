@@ -202,9 +202,11 @@ exports.sharePostPage = makeSharePage({
       isActive: true,
       approvalStatus: 'approved',
     })
-      .select('content images posterName companyName posterDesignation')
+      .select('content images posterName companyName posterDesignation posterType')
       .lean();
     if (!post) return null;
+    // Admin ki post — preview me "Admin" nahi, brand naam.
+    if (post.posterType === 'admin') post.posterName = 'Sitelink';
 
     const by = [post.companyName, post.posterDesignation].find(
       (v) => v && v.trim()
@@ -212,9 +214,9 @@ exports.sharePostPage = makeSharePage({
     return {
       title: by
         ? `${post.posterName} · ${truncate(by, 40)}`
-        : String(post.posterName || 'SiteLink'),
+        : String(post.posterName || 'Sitelink'),
       description:
-        truncate(post.content, 160) || 'Dekhiye SiteLink community par.',
+        truncate(post.content, 160) || 'Dekhiye Sitelink community par.',
       image: (post.images && post.images[0]) || null,
     };
   },
