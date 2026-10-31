@@ -105,7 +105,7 @@ function formatPost(post, { viewerId } = {}) {
 exports.getCommunityFeed = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     const skip = (page - 1) * limit;
 
     const filter = {
@@ -113,21 +113,51 @@ exports.getCommunityFeed = async (req, res) => {
       approvalStatus: "approved",
     };
 
-    const [posts, total] = await Promise.all([
-      Post.aggregate([
-        { $match: filter },
-        { $addFields: {
-          _dayBucket: { $dateTrunc: { date: '$createdAt', unit: 'day' } },
-          _adminFirst: { $cond: [{ $eq: ['$posterType', 'admin'] }, 0, 1] },
-        }},
-        { $sort: { _dayBucket: -1, _adminFirst: 1, createdAt: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'postedBy' } },
-        { $unwind: { path: '$postedBy', preserveNullAndEmptyArrays: true } },
-      ]),
-      Post.countDocuments(filter),
-    ]);
+    const lookupAuthor = [
+      { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'postedBy' } },
+      { $unwind: { path: '$postedBy', preserveNullAndEmptyArrays: true } },
+    ];
+    const sortStages = [
+      { $addFields: {
+        _dayBucket: { $dateTrunc: { date: '$createdAt', unit: 'day' } },
+        _adminFirst: { $cond: [{ $eq: ['$posterType', 'admin'] }, 0, 1] },
+      }},
+      { $sort: { _dayBucket: -1, _adminFirst: 1, createdAt: -1 } },
+    ];
+
+    // ── Search (poore feed me, sirf load hui posts me nahi) ──────────
+    // Post ka text, naam, company, aur likhne wale ki skill (primary +
+    // additional) — "welder" likho to welders ki posts. Admin ki post
+    // brand naam "Sitelink" se bhi mile.
+    const search = String(req.query.search || '').trim().slice(0, 60);
+    let pipeline;
+    let total;
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchMatch = {
+        $match: {
+          $or: [
+            { content: rx },
+            { posterName: rx },
+            { companyName: rx },
+            { posterDesignation: rx },
+            { 'postedBy.name': rx },
+            { 'postedBy.companyName': rx },
+            { 'postedBy.primarySkill': rx },
+            { 'postedBy.skills.skillName': rx },
+            ...(rx.test(BRAND_NAME) ? [{ posterType: 'admin' }] : []),
+          ],
+        },
+      };
+      const base = [{ $match: filter }, ...lookupAuthor, searchMatch];
+      const [counted] = await Post.aggregate([...base, { $count: 'n' }]);
+      total = counted ? counted.n : 0;
+      pipeline = [...base, ...sortStages, { $skip: skip }, { $limit: limit }];
+    } else {
+      total = await Post.countDocuments(filter);
+      pipeline = [{ $match: filter }, ...sortStages, { $skip: skip }, { $limit: limit }, ...lookupAuthor];
+    }
+    const posts = await Post.aggregate(pipeline);
 
     // Re-populate likes.userId for name (aggregate doesn't auto-populate)
     await Post.populate(posts, { path: 'likes.userId', select: 'name' });
