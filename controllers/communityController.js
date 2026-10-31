@@ -15,6 +15,13 @@ const BRAND_NAME = 'Sitelink';
 const displayPosterName = (post) =>
   post.posterType === 'admin' ? BRAND_NAME : post.posterName;
 
+// Likhne wale worker ki skills ke naam (primary + additional) — app feed
+// me skill se search kar sake ("welder" likho to welders ki posts).
+const posterSkillNames = (author) => [
+  author?.primarySkill,
+  ...(author?.skills || []).map((s) => s?.skillName),
+].filter(Boolean);
+
 // Feed/post me dikhne wala avatar.
 //
 // Vendor ki pehchaan uski company hai, isliye uska avatar company logo
@@ -78,6 +85,7 @@ function formatPost(post, { viewerId } = {}) {
       author?.primarySkill ||
       null,
     companyName: post.companyName || author?.companyName || null,
+    posterSkills: posterSkillNames(author),
     ...posterRatingFields(post, author, { isSelf }),
     verification: post.verification,
     approvalStatus: post.approvalStatus,
@@ -140,6 +148,7 @@ exports.getCommunityFeed = async (req, res) => {
         post.postedBy?.primarySkill ||
         null,
       companyName: post.companyName || post.postedBy?.companyName || null,
+      posterSkills: posterSkillNames(post.postedBy),
       ...posterRatingFields(post, post.postedBy),
       verification: post.verification,
       likesCount: post.likesCount,
