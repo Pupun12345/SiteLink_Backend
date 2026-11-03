@@ -3,6 +3,7 @@ const Post = require('../models/Post');
 // Filename lowercase hai (models/job.js) — Linux case-sensitive hai, isliye
 // '../models/Job' wahan MODULE_NOT_FOUND deta tha (Windows par chal jaata hai).
 const Job = require('../models/job');
+const { isJobLive, POSTER_FIELDS } = require('../utils/jobVisibility');
 
 // ═══════════════════════════════════════════════════════════════════
 //  SHARE / DEEP LINK LANDING
@@ -201,9 +202,11 @@ exports.sharePostPage = makeSharePage({
       isActive: true,
       approvalStatus: 'approved',
     })
-      .select('content images posterName companyName posterDesignation')
+      .select('content images posterName companyName posterDesignation posterType')
       .lean();
     if (!post) return null;
+    // Admin ki post — preview me "Admin" nahi, brand naam.
+    if (post.posterType === 'admin') post.posterName = 'Sitelink';
 
     const by = [post.companyName, post.posterDesignation].find(
       (v) => v && v.trim()
@@ -211,9 +214,9 @@ exports.sharePostPage = makeSharePage({
     return {
       title: by
         ? `${post.posterName} · ${truncate(by, 40)}`
-        : String(post.posterName || 'SiteLink'),
+        : String(post.posterName || 'Sitelink'),
       description:
-        truncate(post.content, 160) || 'Dekhiye SiteLink community par.',
+        truncate(post.content, 160) || 'Dekhiye Sitelink community par.',
       image: (post.images && post.images[0]) || null,
     };
   },
@@ -237,9 +240,11 @@ exports.shareJobPage = makeSharePage({
       isActive: true,
       approvalStatus: 'approved',
     })
-      .select('title company location salary salaryType description isUrgent')
+      .select('title company location salary salaryType description isUrgent isActive approvalStatus createdAt postedBy')
+      .populate('postedBy', POSTER_FIELDS)
       .lean();
-    if (!job) return null;
+    // 30 din / vendor ka plan khatam — expire job ka preview nahi.
+    if (!job || !isJobLive(job, job.postedBy)) return null;
 
     // "₹800/day · Andheri, Mumbai" — preview me sabse kaam ki do baatein
     const bits = [];

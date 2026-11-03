@@ -4,6 +4,30 @@ const Skill = require('../models/Skill');
 const { generateOTP, getOTPExpiry, DEV_OTP } = require('../utils/otpUtils');
 const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
+const notifyAdmin = require('../utils/notifyAdmin');
+
+/// Worker ke documents ka review, app ko bhejne ke liye.
+///
+/// Admin sirf GOVERNMENT ID approve / reject karta hai. Experience
+/// certificate ka koi review nahi — wo sirf vendor ko dikhane ke liye hain
+/// (hire hone ke chance badhte hain), isliye unka review kabhi nahi bhejte.
+///
+/// Document-wise review aane se PEHLE verify hue workers ke paas ID ka
+/// review record nahi hai — unki ID approved maanate hain. (Verify ke baad
+/// nayi ID upload ki ho to uska record nahi hoga par purani ID ka hoga —
+/// wo sahi me "under review" hai.)
+function workerDocumentReviews(user) {
+  if (!user.governmentID) return [];
+  const idReviews = (user.documentReviews || []).filter((r) => r.docType === 'governmentID');
+  const current = idReviews.find((r) => r.path === user.governmentID);
+  if (current) {
+    return [{ path: current.path, docType: 'governmentID', status: current.status, reason: current.reason || null }];
+  }
+  if (idReviews.length === 0 && user.verificationStatus === 'verified') {
+    return [{ path: user.governmentID, docType: 'governmentID', status: 'approved', reason: null }];
+  }
+  return [];
+}
 const { hasActiveSubscription } = require('../utils/subscription');
 
 // ── Direct-upload helpers ─────────────────────────────────────────────────────
@@ -1102,6 +1126,11 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
+        verificationRejectedReason: regularUser.verificationRejectedReason,
+        // Har document ka admin review (path → approved / rejected + reason).
+        // Jis document ka review nahi wo "under review" hai. App isi se
+        // sirf rejected documents par Re-upload dikhata hai.
+        documentReviews: workerDocumentReviews(regularUser),
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1133,6 +1162,7 @@ exports.getProfile = async (req, res) => {
         isVerified: regularUser.isVerified,
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
+        verificationRejectedReason: regularUser.verificationRejectedReason,
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1552,7 +1582,42 @@ exports.editWorkerProfile = async (req, res) => {
       });
     }
 
+    // ── Government ID badli ──────────────────────────────────────────
+    // Admin sirf Government ID review karta hai. Experience certificates
+    // worker kabhi bhi jode / badle / hataye — unse verification status par
+    // koi asar nahi aur admin ko alert bhi nahi (wo sirf vendor ke liye hain).
+    //
+    // Nayi ID upload hui → uska purana review hatao (nayi ID "under review").
+    // Admin ne reject kiya tha → nayi ID aate hi wapas 'pending' + admin alert.
+    const idChanged = user.isModified('governmentID') && !!req.files?.governmentID;
+    const wasRejected = user.verificationStatus === 'rejected';
+    let resubmitted = false;
+    if (idChanged) {
+      user.documentReviews = (user.documentReviews || []).filter(
+        (r) => r.docType === 'governmentID' && r.path === user.governmentID);
+      if (wasRejected) {
+        user.verificationStatus = 'pending';
+        user.verificationRejectedReason = null;
+        user.verificationReviewedAt = null;
+        resubmitted = true;
+      }
+    }
+
     await user.save();
+
+    // Admin panel me alert — sirf nayi Government ID par (review karni hai).
+    if (idChanged) {
+      notifyAdmin({
+        title: resubmitted ? 'Government ID re-uploaded after rejection' : 'Worker uploaded a new Government ID',
+        message: `${user.name || 'A worker'} (${user.phone || 'no phone'}) uploaded a new Government ID. Please review.`,
+        category: resubmitted ? 'warning' : 'info',
+        priority: resubmitted ? 'high' : 'medium',
+        userId: user._id,
+        actionUrl: `/admin/workers/${user._id}`,
+        actionText: 'Review Government ID',
+        metadata: { workerName: user.name, phone: user.phone, uploaded: 'Government ID' },
+      });
+    }
     const savedUser = await User.findById(user._id);
 
     res.json({
