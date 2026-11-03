@@ -1589,7 +1589,7 @@ exports.editWorkerProfile = async (req, res) => {
     //
     // Nayi ID upload hui → uska purana review hatao (nayi ID "under review").
     // Admin ne reject kiya tha → nayi ID aate hi wapas 'pending' + admin alert.
-    const idChanged = user.isModified('governmentID') && !!req.files?.governmentID;
+    const idChanged = user.isModified('governmentID') && !!editGovtId;
     const wasRejected = user.verificationStatus === 'rejected';
     let resubmitted = false;
     if (idChanged) {
