@@ -286,8 +286,13 @@ function razorpayPeriod(frequency) {
 const verifiedPlanIds = new Set();
 
 async function ensureRazorpayPlan(plan) {
+  const { period, interval } = razorpayPeriod(plan.frequency);
+  const amountPaise = Math.round(Number(plan.amount) * 100);
+  // Cache key me keemat bhi — admin price badle to dobara check ho.
+  const cacheKey = `${plan.razorpayPlanId}:${amountPaise}:${period}:${interval}`;
+
   if (plan.razorpayPlanId) {
-    if (verifiedPlanIds.has(plan.razorpayPlanId)) return plan.razorpayPlanId;
+    if (verifiedPlanIds.has(cacheKey)) return plan.razorpayPlanId;
     // Saved id abhi ke Razorpay account (test / live) me hai? Test key se
     // bani id live key ke saath "does not exist" deti hai — tab nayi bana
     // lete hain, kisi ko DB me haath lagane ki zaroorat nahi.
@@ -295,19 +300,30 @@ async function ensureRazorpayPlan(plan) {
       headers: { Authorization: razorpayAuthHeader() },
     });
     if (check.ok) {
-      verifiedPlanIds.add(plan.razorpayPlanId);
-      return plan.razorpayPlanId;
-    }
-    if (check.status !== 400 && check.status !== 404) {
+      // Razorpay plan ki keemat/period edit nahi hoti. Admin ne price ya
+      // frequency badli (kisi bhi raaste se — admin panel ya API) to
+      // purana plan purani keemat charge karega — naya bana lete hain.
+      const rzp = await check.json();
+      if (rzp?.item?.amount === amountPaise
+          && rzp?.period === period
+          && Number(rzp?.interval) === Number(interval)) {
+        verifiedPlanIds.add(cacheKey);
+        return plan.razorpayPlanId;
+      }
+      console.warn(`[payments] plan ${plan.planName}: Razorpay plan has old price `
+        + `(₹${(rzp?.item?.amount || 0) / 100} ${rzp?.period}) — creating a new one `
+        + `at ₹${amountPaise / 100} ${period}`);
+      plan.razorpayPlanId = null;
+    } else if (check.status !== 400 && check.status !== 404) {
       // Network / Razorpay down — purani id mat bigaado, error do.
       throw new Error(`Could not verify Razorpay plan (HTTP ${check.status})`);
+    } else {
+      console.warn(`[payments] plan ${plan.planName}: saved Razorpay plan id not found `
+        + `on this account (test → live?) — creating a new one`);
+      plan.razorpayPlanId = null;
     }
-    console.warn(`[payments] plan ${plan.planName}: saved Razorpay plan id not found `
-      + `on this account (test → live?) — creating a new one`);
-    plan.razorpayPlanId = null;
   }
 
-  const { period, interval } = razorpayPeriod(plan.frequency);
   const res = await fetch(`${RAZORPAY_BASE}/plans`, {
     method: 'POST',
     headers: {
@@ -319,7 +335,7 @@ async function ensureRazorpayPlan(plan) {
       interval,
       item: {
         name: plan.planName,
-        amount: Math.round(Number(plan.amount) * 100),
+        amount: amountPaise,
         currency: 'INR',
         description: `Sitelink ${plan.planName}`,
       },
