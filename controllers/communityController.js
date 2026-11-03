@@ -323,11 +323,20 @@ exports.createPost = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const images = req.files?.images
-      ? req.files.images.map(file => file.path)
-      : [];
+    // Only accept pre-uploaded Cloudinary URLs from req.body (direct-upload path).
+    let images = [];
+    if (req.body.images) {
+      try {
+        const raw = typeof req.body.images === 'string' ? JSON.parse(req.body.images) : req.body.images;
+        const arr = Array.isArray(raw) ? raw : [raw];
+        images = arr.filter(u => typeof u === 'string' && u.startsWith('https://res.cloudinary.com/'));
+      } catch { images = []; }
+    }
 
-    const video = req.files?.video?.[0]?.path || null;
+    let video = null;
+    if (req.body.video && typeof req.body.video === 'string' && req.body.video.startsWith('https://res.cloudinary.com/')) {
+      video = req.body.video;
+    }
 
     // Text ya media — kuch to hona chahiye. Sirf photo wala post theek hai,
     // sirf video wala bhi; poora khaali nahi.

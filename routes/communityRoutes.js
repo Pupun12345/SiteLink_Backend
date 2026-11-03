@@ -14,29 +14,18 @@ const {
   getCommentsByPost,
 } = require('../controllers/communityController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
-const { handleUpload } = require('../middleware/upload');
 
 // GET community feed
 router.get('/feed', protect, getCommunityFeed);
 
-// GET current user's own posts (must come before '/posts/:id...' routes)
 router.get('/posts/mine', protect, getMyPosts);
-
-// GET ek single post — shared deep link kholne par app isi ko call karti hai
-// NOTE: ye ':postId' route se PEHLE hona chahiye, warna 'user' ko
-// postId samajh liya jayega.
 router.get('/posts/user/:userId', protect, getPostsByUser);
-
 router.get('/posts/:postId', protect, getPostById);
 
-// POST create post
-router.post('/posts', protect, handleUpload(upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }])), createPost);
+// POST create post — JSON body only (Cloudinary URLs from direct upload)
+router.post('/posts', protect, createPost);
 
-// PUT like/unlike post
 router.put('/posts/:postId/like', protect, likeUnlikePost);
-
-// DELETE post
 router.delete('/posts/:postId', protect, deletePost);
 
 // Comment routes

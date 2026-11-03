@@ -8,3 +8,5 @@ removeIndex.js
 seedDemoJobs.js
 seedJobs.js
 seedLegalPolicies.js
+seedVendorPlans.js
+

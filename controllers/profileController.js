@@ -6,6 +6,38 @@ const { sendOtpSms } = require('../utils/sendOtpSms');
 const notifyUser = require('../utils/notifyUser');
 const { hasActiveSubscription } = require('../utils/subscription');
 
+// ── Direct-upload helpers ─────────────────────────────────────────────────────
+// Accepts only a pre-uploaded Cloudinary secure_url from req.body.
+// URL sent in req.body (new direct-upload path). Returns the secure_url string
+// or null if neither is present.
+//
+// Security: body URLs are only accepted when they originate from our own
+// Cloudinary account (validated by the /api/uploads/confirm endpoint before
+// the profile save call). The public_id ownership check in confirmUpload
+// ensures the URL belongs to this user.
+// Returns the URL string or null.
+function resolveFileUrl(req, fieldName) {
+  const url = req.body[fieldName];
+  if (url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com/')) {
+    return url;
+  }
+  return null;
+}
+
+// Accepts only an array of pre-uploaded Cloudinary secure_urls from req.body.
+// Returns a filtered array of valid URLs.
+function resolveFileUrls(req, fieldName) {
+  const raw = req.body[fieldName];
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const arr = Array.isArray(parsed) ? parsed : [parsed];
+    return arr.filter(u => typeof u === 'string' && u.startsWith('https://res.cloudinary.com/'));
+  } catch {
+    return [];
+  }
+}
+
 const STATES = [
   { id: 1, name: 'Andhra Pradesh' },
   { id: 2, name: 'Arunachal Pradesh' },
@@ -1293,28 +1325,24 @@ exports.createWorkerProfile = async (req, res) => {
     user.userType = 'worker';
     user.isProfileCreated = true;
 
-    if (!req.files || !req.files.governmentID) {
+    const govtId = resolveFileUrl(req, 'governmentID');
+    if (!govtId) {
       return res.status(400).json({
         success: false,
         message: "Government ID is required."
       });
     }
 
-    if (req.files.profileImage) {
-      user.profileImage = req.files.profileImage[0].path;
-    }
+    const profileImg = resolveFileUrl(req, 'profileImage');
+    if (profileImg) user.profileImage = profileImg;
 
-    if (req.files.workSamplesPhoto) {
-      user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
-    }
+    const workSamples = resolveFileUrls(req, 'workSamplesPhoto');
+    if (workSamples.length) user.workSamplesPhoto = workSamples;
 
-    if (req.files.experienceCertificate) {
-      user.experienceCertificate =
-        req.files.experienceCertificate.map((f) => f.path);
-    }
+    const expCerts = resolveFileUrls(req, 'experienceCertificate');
+    if (expCerts.length) user.experienceCertificate = expCerts;
 
-    // Mandatory field
-    user.governmentID = req.files.governmentID[0].path;
+    user.governmentID = govtId;
     await user.save();
 
     res.json({
@@ -1476,13 +1504,14 @@ exports.editWorkerProfile = async (req, res) => {
 
     if (location) user.location = location.trim();
 
-    if (req.files) {
-      if (req.files.profileImage) {
-        user.profileImage = req.files.profileImage[0].path;
-      }
-      if (req.files.workSamplesPhoto) user.workSamplesPhoto = req.files.workSamplesPhoto.map(f => f.path);
-      if (req.files.governmentID) user.governmentID = req.files.governmentID[0].path;
-    }
+    const editProfileImg = resolveFileUrl(req, 'profileImage');
+    if (editProfileImg) user.profileImage = editProfileImg;
+
+    const editGovtId = resolveFileUrl(req, 'governmentID');
+    if (editGovtId) user.governmentID = editGovtId;
+
+    const editWorkSamples = resolveFileUrls(req, 'workSamplesPhoto');
+    if (editWorkSamples.length) user.workSamplesPhoto = editWorkSamples;
 
     // ── Experience certificates (multiple) ────────────────────────────
     // Edit me sirf naye files bhejna kaafi nahi: aisa karne par purane
@@ -1493,7 +1522,7 @@ exports.editWorkerProfile = async (req, res) => {
     // Final = rakhe hue + naye. `keepExperienceCertificate` bheja hi na
     // ho aur naye files bhi na hon, to field chhui hi nahi jaati.
     {
-      const added = (req.files?.experienceCertificate || []).map((f) => f.path);
+      const added = resolveFileUrls(req, 'experienceCertificate');
       const keepRaw = req.body.keepExperienceCertificate;
 
       if (keepRaw !== undefined || added.length) {
@@ -1616,12 +1645,14 @@ exports.createVendorProfile = async (req, res) => {
     user.userType = 'vendor';
     user.isProfileCreated = true;
 
-    if (req.files) {
-      if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
-      if (req.files.companyLogo) user.companyLogo = req.files.companyLogo[0].path;
-      if (req.files.panCardImage) user.panCardImage = req.files.panCardImage[0].path;
-      if (req.files.gstCertificate) user.gstCertificate = req.files.gstCertificate[0].path;
-    }
+    const vProfileImg = resolveFileUrl(req, 'profileImage');
+    if (vProfileImg) user.profileImage = vProfileImg;
+    const vCompanyLogo = resolveFileUrl(req, 'companyLogo');
+    if (vCompanyLogo) user.companyLogo = vCompanyLogo;
+    const vPanCard = resolveFileUrl(req, 'panCardImage');
+    if (vPanCard) user.panCardImage = vPanCard;
+    const vGst = resolveFileUrl(req, 'gstCertificate');
+    if (vGst) user.gstCertificate = vGst;
 
     if (!user.panCardImage) return res.status(400).json({ success: false, message: 'PanCard image is required' });
     if (!user.gstCertificate) return res.status(400).json({ success: false, message: 'GST Certificate image is required' });
@@ -1671,12 +1702,14 @@ exports.editVendorProfile = async (req, res) => {
     if (website) user.website = website.trim();
     if (panNumber) user.panNumber = panNumber;
 
-    if (req.files) {
-      if (req.files.profileImage) user.profileImage = req.files.profileImage[0].path;
-      if (req.files.companyLogo) user.companyLogo = req.files.companyLogo[0].path;
-      if (req.files.panCardImage) user.panCardImage = req.files.panCardImage[0].path;
-      if (req.files.gstCertificate) user.gstCertificate = req.files.gstCertificate[0].path;
-    }
+    const evProfileImg = resolveFileUrl(req, 'profileImage');
+    if (evProfileImg) user.profileImage = evProfileImg;
+    const evCompanyLogo = resolveFileUrl(req, 'companyLogo');
+    if (evCompanyLogo) user.companyLogo = evCompanyLogo;
+    const evPanCard = resolveFileUrl(req, 'panCardImage');
+    if (evPanCard) user.panCardImage = evPanCard;
+    const evGst = resolveFileUrl(req, 'gstCertificate');
+    if (evGst) user.gstCertificate = evGst;
 
     // Note: PAN/GST images are required at profile CREATION (createVendorProfile),
     // not on every edit — a vendor editing e.g. just their name shouldn't be
