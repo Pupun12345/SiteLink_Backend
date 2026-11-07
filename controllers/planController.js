@@ -80,6 +80,11 @@ exports.getPlans = async (req, res) => {
             ...plan,
             isCurrentPlan: subscription.active
                 && subscription.planId === plan._id.toString(),
+            // Pehle cycle ka offer (jaise ₹5) is user ko abhi milega? Sirf
+            // ek baar milta hai — le chuka ho to app poori price dikhaye.
+            introOfferAvailable: Number(plan.introAmount) >= 1
+                && Number(plan.introAmount) < Number(plan.amount)
+                && !req.user.introOfferUsed,
         }));
 
         return res.status(200).json({ success: true, data, subscription });
@@ -91,7 +96,7 @@ exports.getPlans = async (req, res) => {
 
 exports.createPlan = async (req, res) => {
     try {
-        const { planName, userType, planType, frequency, amount, features, maxWorkers } = req.body;
+        const { planName, userType, planType, frequency, amount, features, maxWorkers, introAmount } = req.body;
         if (!planName || !userType || !planType || !frequency || amount === undefined) {
             return res.status(400).json({ success: false, message: 'planName, userType, planType, frequency and amount are required' });
         }
@@ -105,6 +110,7 @@ exports.createPlan = async (req, res) => {
             // hai, aur 0 ka matlab hai "cap off" — yani vendor unlimited
             // workers post kar lega. Isliye admin ise zaroor bheje.
             maxWorkers: maxWorkers === undefined ? 0 : Math.max(0, parseInt(maxWorkers, 10) || 0),
+            introAmount: Math.max(0, parseFloat(introAmount) || 0),
             features: Array.isArray(features) ? features.filter(f => f.trim()) : [],
             isActive: true,
         });
@@ -117,7 +123,7 @@ exports.createPlan = async (req, res) => {
 exports.editPlanAmount = async (req, res) => {
     try {
         const { id } = req.params;
-        const { planName, userType, planType, frequency, amount, features, maxWorkers } = req.body;
+        const { planName, userType, planType, frequency, amount, features, maxWorkers, introAmount } = req.body;
 
         const plan = await planDetails.findById(id);
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
@@ -133,6 +139,7 @@ exports.editPlanAmount = async (req, res) => {
         // Pehle ye handle hi nahi hota tha — admin panel se plan edit karte
         // hi quota chup-chaap 0 (unlimited) reh jaata tha.
         if (maxWorkers !== undefined) plan.maxWorkers = Math.max(0, parseInt(maxWorkers, 10) || 0);
+        if (introAmount !== undefined) plan.introAmount = Math.max(0, parseFloat(introAmount) || 0);
         if (features !== undefined) plan.features = Array.isArray(features) ? features.filter(f => f.trim()) : [];
 
         // Razorpay par plan ka amount/frequency EDIT nahi hota. Yahan

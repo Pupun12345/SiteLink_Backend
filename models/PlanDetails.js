@@ -39,6 +39,14 @@ const planDetailsSchema = new mongoose.Schema({
         default: 0,
         min: 0,
     },
+    // Pehle mahine/saal ki offer price (jaise ₹5). 0 = koi offer nahi.
+    // Auto-pay me user abhi ye deta hai, aur ek cycle baad se Razorpay
+    // har cycle poora `amount` kaatta hai. Har user ko sirf ek baar.
+    introAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     // Razorpay ka Plan id (auto-payment ke liye). Razorpay par
     // subscription banane se pehle wahan ek Plan hona zaroori hai.
     // Pehli baar auto-pay subscribe hone par backend khud bana ke yahan

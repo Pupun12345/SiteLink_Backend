@@ -394,22 +394,43 @@ exports.createSubscription = async (req, res) => {
     // user cancel na kare" jaisa behave kare.
     const totalCount = plan.frequency === 'yearly' ? 10 : 120;
 
+    // ── Pehle cycle ka offer (jaise ₹5, phir ₹2999/month) ──────────
+    // Razorpay: `start_at` ek cycle aage + `addons` me offer amount.
+    // Mandate lete waqt user sirf addon (₹5) deta hai; start_at se
+    // Razorpay har cycle poora plan amount khud kaatta hai.
+    const intro = Number(plan.introAmount) || 0;
+    const offer = intro >= 1 && intro < Number(plan.amount) && !user.introOfferUsed;
+    const introPaise = Math.round(intro * 100);
+
+    const subPayload = {
+      plan_id: razorpayPlanId,
+      total_count: totalCount,
+      quantity: 1,
+      customer_notify: 1,
+      notes: {
+        userId: user._id.toString(),
+        planId: plan._id.toString(),
+        ...(offer ? { introOffer: '1' } : {}),
+      },
+    };
+    if (offer) {
+      subPayload.start_at = Math.floor(addCycle(new Date(), plan.frequency).getTime() / 1000);
+      subPayload.addons = [{
+        item: {
+          name: `${plan.planName} - first ${plan.frequency === 'yearly' ? 'year' : 'month'}`,
+          amount: introPaise,
+          currency: 'INR',
+        },
+      }];
+    }
+
     const rzpRes = await fetch(`${RAZORPAY_BASE}/subscriptions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: razorpayAuthHeader(),
       },
-      body: JSON.stringify({
-        plan_id: razorpayPlanId,
-        total_count: totalCount,
-        quantity: 1,
-        customer_notify: 1,
-        notes: {
-          userId: user._id.toString(),
-          planId: plan._id.toString(),
-        },
-      }),
+      body: JSON.stringify(subPayload),
     });
 
     const sub = await rzpRes.json();
@@ -428,7 +449,10 @@ exports.createSubscription = async (req, res) => {
       data: {
         subscriptionId: sub.id,
         planName: plan.planName,
-        amount: Math.round(Number(plan.amount) * 100),
+        // Abhi kitna katega — offer ho to offer amount.
+        amount: offer ? introPaise : Math.round(Number(plan.amount) * 100),
+        introOffer: offer,
+        renewAmount: Math.round(Number(plan.amount) * 100),
         currency: 'INR',
         keyId: process.env.RAZORPAY_KEY_ID,
       },
@@ -501,7 +525,13 @@ exports.verifySubscription = async (req, res) => {
       });
     }
 
-    const expiry = addCycle(new Date(), plan.frequency);
+    // Offer wali subscription: Razorpay ka pehla poora charge `start_at`
+    // par hai — tab tak ka plan offer ke paise se chalta hai.
+    const usedIntro = subBody?.notes?.introOffer === '1';
+    const startAt = Number(subBody?.start_at) * 1000;
+    const expiry = usedIntro && startAt > Date.now()
+      ? new Date(startAt)
+      : addCycle(new Date(), plan.frequency);
 
     const subscription = await Subscription.create({
       user: user._id,
@@ -509,7 +539,7 @@ exports.verifySubscription = async (req, res) => {
       status: 'active',
       startDate: new Date(),
       endDate: expiry,
-      amount: plan.amount,
+      amount: usedIntro ? Number(plan.introAmount) || plan.amount : plan.amount,
       isRecurring: true,
       razorpaySubscriptionId: razorpay_subscription_id,
     });
@@ -522,6 +552,7 @@ exports.verifySubscription = async (req, res) => {
     user.subscription = true;
     user.razorpaySubscriptionId = razorpay_subscription_id;
     user.autoRenew = true;
+    if (usedIntro) user.introOfferUsed = true;
     await user.save();
 
     notifyUser(user._id, {

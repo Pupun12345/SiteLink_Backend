@@ -238,6 +238,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Pehle mahine ka offer (jaise ₹5) le chuka hai — offer har user ko
+  // sirf ek baar, warna cancel karke baar-baar sasta mahina le leta.
+  introOfferUsed: {
+    type: Boolean,
+    default: false,
+  },
   lastPaymentId: {
     type: String,
     default: null,
