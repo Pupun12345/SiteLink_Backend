@@ -414,10 +414,10 @@ exports.createSubscription = async (req, res) => {
       },
     };
     if (offer) {
-      subPayload.start_at = Math.floor(addCycle(new Date(), plan.frequency).getTime() / 1000);
+      subPayload.start_at = Math.floor(addCycle(new Date(), 'monthly').getTime() / 1000);
       subPayload.addons = [{
         item: {
-          name: `${plan.planName} - first ${plan.frequency === 'yearly' ? 'year' : 'month'}`,
+          name: `${plan.planName} - first month`,
           amount: introPaise,
           currency: 'INR',
         },
