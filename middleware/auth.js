@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const BlacklistedToken = require('../models/BlacklistedToken');
+const { isVerifiedWorker, NOT_VERIFIED } = require('../utils/verification');
 
 exports.protect = async (req, res, next) => {
   let token;
@@ -137,16 +138,19 @@ exports.requireAdmin = (req, res, next) => {
   next();
 };
 
+// Sirf verified worker hi job apply kar sakta hai.
 exports.applicable = async (req, res, next) => {
-  const {id:applicantId}=req.user;
-
-  const user=await User.findById(applicantId);
-
-  if(user.userType!=='worker' || user.verificationStatus!=='verified'){
-    return res.status(403).json({
-      success: false,
-      message: 'Not allow to apply to job',
-    });
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.userType !== 'worker') {
+      return res.status(403).json({ success: false, message: 'Only workers can apply to jobs' });
+    }
+    if (!isVerifiedWorker(user)) {
+      return res.status(403).json(NOT_VERIFIED);
+    }
+    next();
+  } catch (error) {
+    // Pehle try/catch nahi tha — DB error par request latki reh jaati thi.
+    res.status(500).json({ success: false, message: 'Could not check verification' });
   }
-  next();
 }

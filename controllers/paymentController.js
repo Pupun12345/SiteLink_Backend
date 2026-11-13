@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Subscription = require('../models/Subscription');
 const notifyUser = require('../utils/notifyUser');
+const { isVerifiedWorker, NOT_VERIFIED } = require('../utils/verification');
 
 // PlanDetails (userType + planType) -> Subscription.plan enum.
 function subscriptionPlanKey(plan) {
@@ -45,6 +46,12 @@ exports.createOrder = async (req, res) => {
     const plan = await PlanDetails.findById(planId);
     if (!plan) {
       return res.status(404).json({ success: false, message: 'Plan not found' });
+    }
+
+    // Bina verification ke worker plan nahi le sakta.
+    if (req.user.userType === 'worker') {
+      const me = await User.findById(req.user.id).select('isVerified verificationStatus');
+      if (!isVerifiedWorker(me)) return res.status(403).json(NOT_VERIFIED);
     }
 
     const amountPaise = Math.round(Number(plan.amount) * 100);
@@ -375,6 +382,10 @@ exports.createSubscription = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    // Bina verification ke worker plan nahi le sakta.
+    if (user.userType === 'worker' && !isVerifiedWorker(user)) {
+      return res.status(403).json(NOT_VERIFIED);
     }
 
     // Pehle se auto-pay chal raha ho to dobara na banao — warna user ke
