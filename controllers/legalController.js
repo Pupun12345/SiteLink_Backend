@@ -37,7 +37,12 @@ function formatPolicyContent(raw) {
     else if (/^\d{1,2}\.\s+\S/.test(line) && short) out.push(`## ${line}`);
     else if ((/^[A-Z]\.\s+\S/.test(line) && short) || (line.endsWith(':') && line.length <= 60)) {
       out.push(`**${line}**`);
-    } else out.push(line);
+    } else {
+      // "45-Day Waiting Period: A claim…", "Important: …" — chhota label
+      // bold, taaki zaroori shart aankh me aaye. URL wali lines nahi chhedte.
+      const m = line.match(/^([A-Z0-9₹][^:]{1,40}):\s+(\S.*)$/);
+      out.push(m && !/https?$/i.test(m[1]) ? `**${m[1]}:** ${m[2]}` : line);
+    }
     first = false;
   }
   // Blank line beech me — warna markdown saari lines ek paragraph me jod deta.
