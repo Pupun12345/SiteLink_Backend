@@ -28,6 +28,25 @@ function workerDocumentReviews(user) {
   }
   return [];
 }
+// Vendor ke verification documents (PAN card, GST certificate) — har ek ka
+// review sirf usi file (path) ka maana jaata hai jo abhi lagi hai. Vendor ne
+// nayi file daal di to purana review lagu nahi (nayi = "under review").
+const VENDOR_DOC_FIELDS = ['panCardImage', 'gstCertificate'];
+function vendorDocumentReviews(user) {
+  const reviews = user.documentReviews || [];
+  return VENDOR_DOC_FIELDS
+    .filter((f) => user[f])
+    .map((f) => {
+      const r = reviews.find((x) => x.docType === f && x.path === user[f]);
+      if (r) return { path: r.path, docType: f, status: r.status, reason: r.reason || null };
+      // Document-wise review se pehle verify hue vendor — approved maano.
+      if (user.verificationStatus === 'verified') {
+        return { path: user[f], docType: f, status: 'approved', reason: null };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
 const { hasActiveSubscription } = require('../utils/subscription');
 
 // ── Direct-upload helpers ─────────────────────────────────────────────────────
@@ -1163,6 +1182,8 @@ exports.getProfile = async (req, res) => {
         language: regularUser.language,
         verificationStatus: regularUser.verificationStatus,
         verificationRejectedReason: regularUser.verificationRejectedReason,
+        // PAN / GST ka alag review — kaunsa document reject hua, kyun.
+        documentReviews: vendorDocumentReviews(regularUser),
         subscription: regularUser.subscription,
         // Live plan status. `subscription` boolean stale ho jaata hai (expiry
         // par koi cron use false nahi karta), isliye app paid features
@@ -1790,6 +1811,16 @@ exports.editVendorProfile = async (req, res) => {
       user.isModified('gstNumber') ||
       user.isModified('panNumber');
     const wasRejected = user.verificationStatus === 'rejected';
+    // Sirf number theek kiya (file wahi) → us document ka purana review
+    // hatao, warna "rejected" hi dikhta rehta. Nayi file par review khud
+    // lagu nahi hota (path badal jaata hai).
+    const dropReview = [];
+    if (user.isModified('panNumber')) dropReview.push('panCardImage');
+    if (user.isModified('gstNumber')) dropReview.push('gstCertificate');
+    if (dropReview.length) {
+      user.documentReviews = (user.documentReviews || []).filter(
+        (r) => !dropReview.includes(r.docType));
+    }
     if (docsChanged && wasRejected) {
       user.verificationStatus = 'pending';
       user.isVerified = false;
