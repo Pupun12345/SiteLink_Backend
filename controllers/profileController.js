@@ -1623,7 +1623,7 @@ exports.editWorkerProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Worker profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, governmentID: savedUser.governmentID, workSamplesPhoto: savedUser.workSamplesPhoto, experienceCertificate: savedUser.experienceCertificate,language: user.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, workCity: savedUser.city, primarySkill: savedUser.primarySkill, additionalSkills: savedUser.skills, totalExperience: savedUser.experience, workState: savedUser.workState, willingtoRelocate: savedUser.willingtoRelocate, salaryType: savedUser.salaryType, salary: savedUser.salary, governmentID: savedUser.governmentID, workSamplesPhoto: savedUser.workSamplesPhoto, experienceCertificate: savedUser.experienceCertificate,language: user.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, verificationRejectedReason: savedUser.verificationRejectedReason, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1728,7 +1728,7 @@ exports.createVendorProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Vendor profile created successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, panNumber: savedUser.panNumber, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, website: savedUser.website, panNumber: savedUser.panNumber, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, verificationRejectedReason: savedUser.verificationRejectedReason, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1780,13 +1780,45 @@ exports.editVendorProfile = async (req, res) => {
     // not on every edit — a vendor editing e.g. just their name shouldn't be
     // blocked because those docs aren't being re-uploaded in this request.
 
+    // ── Verification documents badle ─────────────────────────────────
+    // Admin ne reject kiya tha aur vendor ne PAN / GST (document ya number)
+    // dobara diya → wapas 'pending' + admin alert, taaki dobara review ho.
+    // Verified vendor ne badla → status wahi, bas admin ko khabar.
+    const docsChanged =
+      (!!evPanCard && user.isModified('panCardImage')) ||
+      (!!evGst && user.isModified('gstCertificate')) ||
+      user.isModified('gstNumber') ||
+      user.isModified('panNumber');
+    const wasRejected = user.verificationStatus === 'rejected';
+    if (docsChanged && wasRejected) {
+      user.verificationStatus = 'pending';
+      user.isVerified = false;
+      user.verificationRejectedReason = null;
+      user.verificationReviewedAt = null;
+    }
+
     await user.save();
+
+    if (docsChanged) {
+      notifyAdmin({
+        title: wasRejected
+          ? 'Vendor re-uploaded documents after rejection'
+          : 'Vendor updated verification documents',
+        message: `${user.companyName || user.name || 'A vendor'} (${user.phone || 'no phone'}) updated PAN / GST details. Please review.`,
+        category: wasRejected ? 'warning' : 'info',
+        priority: wasRejected ? 'high' : 'medium',
+        userId: user._id,
+        actionUrl: `/admin/vendors/${user._id}`,
+        actionText: 'Review Vendor',
+        metadata: { vendorName: user.companyName || user.name, phone: user.phone, uploaded: 'PAN / GST' },
+      });
+    }
     const savedUser = await User.findById(req.user.id);
 
     res.json({
       success: true,
       message: 'Vendor profile updated successfully',
-      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
+      user: { id: savedUser._id, name: savedUser.name, phone: savedUser.phone, email: savedUser.email, userType: savedUser.userType, role: savedUser.role, profileImage: savedUser.profileImage, companyName: savedUser.companyName, companyLogo: savedUser.companyLogo, gstCertificate: savedUser.gstCertificate, panCardImage: savedUser.panCardImage, designation: savedUser.role, workCity: savedUser.city, workState: savedUser.workState, workArea: savedUser.workArea, gstNumber: savedUser.gstNumber, whatsappNumber: savedUser.whatsappNumber, panNumber: savedUser.panNumber, website: savedUser.website, language: savedUser.language, isVerified: savedUser.isVerified, verificationStatus: savedUser.verificationStatus, verificationRejectedReason: savedUser.verificationRejectedReason, isProfileCreated: savedUser.isProfileCreated, subscription: savedUser.subscription }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
