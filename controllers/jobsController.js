@@ -396,7 +396,7 @@ exports.getJobDetailsById = async (req, res) => {
     }
 
 
-    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience applicationsCount status approvalStatus isActive createdAt postedBy amenities").populate("postedBy", `name designation companyName phone whatsappNumber ${POSTER_FIELDS}`).populate("amenities", "id name category icon")
+    const job = await Job.findById(id).select("title company location latitude longitude quantity roles salary salaryType isUrgent duration startDate description experience applicationsCount status approvalStatus isActive createdAt postedBy postedFor contactName contactWhatsapp companyLogo amenities").populate("postedBy", `name designation companyName phone whatsappNumber ${POSTER_FIELDS}`).populate("amenities", "id name category icon")
       .lean();
 
     if (!job) {
@@ -450,6 +450,21 @@ exports.getJobDetailsById = async (req, res) => {
       if (!isOwner) delete job.postedBy.phone;
       if (!contactUnlocked) delete job.postedBy.whatsappNumber;
     }
+
+    // Admin ne ye job kisi vendor ke liye daali (ya admin ki apni job) —
+    // worker ko job ke saath save hua contact dikhe (vendor ka naam /
+    // company / WhatsApp), admin ka nahi. WhatsApp wahi niyam: application
+    // confirm / hire hone ke baad hi.
+    if (job.postedFor || job.contactName || job.contactWhatsapp) {
+      job.postedBy = {
+        _id: job.postedFor || null,
+        name: job.contactName || null,
+        companyName: job.company || null,
+        ...(contactUnlocked && job.contactWhatsapp ? { whatsappNumber: job.contactWhatsapp } : {}),
+      };
+    }
+    delete job.contactWhatsapp; // raw number kabhi bahar nahi — sirf upar ke niyam se
+    delete job.postedFor;
 
     job.hasApplied = !!applicationStatus;
     job.applicationStatus = applicationStatus;
