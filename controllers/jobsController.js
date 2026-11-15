@@ -56,6 +56,12 @@ function escapeRegex(str) {
 // `applicationStatus` (pending/shortlisted/confirmed/rejected/hired/null) —
 // the requesting worker's own Application.status for this job, if any —
 // lets the browse list mark jobs already applied to (see getJobs below).
+// Admin panel application ko "approved" karta hai, par app sirf
+// pending / shortlisted / confirmed / hired / rejected samajhti hai —
+// "approved" par worker ko "Under review" hi dikhta tha. App ke liye
+// "approved" = "confirmed" (vendor ka contact bhi khulta hai).
+const appStatus = (s) => (s === 'approved' ? 'confirmed' : s);
+
 function _formatJobSummary(job, applicationStatus = null) {
   return {
     _id: job._id,
@@ -167,7 +173,7 @@ exports.getJobs = async (req, res) => {
         job: { $in: jobs.map((j) => j._id) },
       }).select('job status').lean();
       appliedStatusByJob = apps.reduce((acc, a) => {
-        acc[a.job.toString()] = a.status;
+        acc[a.job.toString()] = appStatus(a.status);
         return acc;
       }, {});
     }
@@ -413,7 +419,7 @@ exports.getJobDetailsById = async (req, res) => {
         job: id,
         applicant: req.user.id,
       }).select('status');
-      applicationStatus = myApplication?.status || null;
+      applicationStatus = appStatus(myApplication?.status) || null;
       contactUnlocked = ['confirmed', 'hired'].includes(applicationStatus);
     } else {
       contactUnlocked = isOwner;
@@ -485,6 +491,7 @@ exports.appliedJobs = async (req, res) => {
         populate: { path: 'postedBy', select: 'name companyName' },
       })
       .lean();
+    for (const a of data) a.status = appStatus(a.status);
 
     res.status(200).json({
       success: true,
@@ -1136,7 +1143,7 @@ function _formatApplicant(application) {
     },
     coverLetter: application.coverLetter || null,
     experience: w.experience || null,
-    status: application.status,
+    status: appStatus(application.status),
     createdAt: application.createdAt,
   };
 }
