@@ -459,7 +459,8 @@ exports.createSubscription = async (req, res) => {
       success: true,
       data: {
         subscriptionId: sub.id,
-        planName: plan.planName,
+        // Checkout par dikhta hai — keemat me 18% GST shamil hai, saaf likho.
+        planName: `${plan.planName} · incl. 18% GST`,
         // Abhi kitna katega — offer ho to offer amount.
         amount: offer ? introPaise : Math.round(Number(plan.amount) * 100),
         introOffer: offer,
