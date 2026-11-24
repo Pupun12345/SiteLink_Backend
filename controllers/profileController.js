@@ -1519,6 +1519,8 @@ exports.editWorkerProfile = async (req, res) => {
         });
       }
       user.experience = exp;
+      // Fresher (0 saal) — pichhle kaam ka description lagu nahi.
+      if (exp === 0) user.experienceDescription = null;
     }
 
     if (experienceDescription) {
